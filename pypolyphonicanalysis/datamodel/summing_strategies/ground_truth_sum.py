@@ -1,5 +1,3 @@
-import logging
-
 from pathlib import Path
 
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import (
@@ -8,9 +6,6 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
 
 from pypolyphonicanalysis.settings import Settings
-
-logging.getLogger("sox").setLevel(logging.ERROR)
-
 
 class GroundTruthSum(BaseSummingStrategy):
     def __init__(self, ground_truth_paths: dict[frozenset[str], Path], settings: Settings) -> None:
