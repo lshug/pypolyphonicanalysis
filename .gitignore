@@ -1,0 +1,16 @@
+/.mypy_cache/
+/.ruff_cache/
+/.idea/
+/dist/
+/data/
+/scripts/activation_cache/
+/scripts/audio/
+/scripts/out_wavs/
+/scripts/output/
+__pycache__/
+.tox/
+.coverage
+.cache
+coverage.xml
+*.tar.gz
+todo.txt
