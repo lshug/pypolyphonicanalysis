@@ -107,7 +107,7 @@ class FeatureStore:
             feature_generator,
             feature_index,
         ) in self._feature_generator_and_index_dict.items():
-            if feature_generator is generator:
+            if feature_generator is generator and self._settings.save_training_features:
                 self._save_array_for_sum_track(generated_features[feature_index], sum_track, feature)
         return generated_features[index]
 

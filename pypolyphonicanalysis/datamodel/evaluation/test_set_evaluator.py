@@ -50,7 +50,7 @@ class TestSetEvaluator:
         for idx, sum_track in enumerate(tqdm(self._test_sum_tracks)):
             with nullcontext():  # tf.profiler.experimental.Trace("eval", step_num=idx, _r=1):
                 ground_truth_salience_map = self._feature_store.generate_or_load_feature_for_sum_track(sum_track, Features.SALIENCE_MAP)
-                predicted_salience_map = model.predict_on_file(sum_track.audio_source_path)
+                predicted_salience_map = model.predict_on_sum_track(sum_track)
                 gt_times, gt_freqs = get_estimated_times_and_frequencies_from_salience_map(
                     ground_truth_salience_map,
                     self._settings.threshold,

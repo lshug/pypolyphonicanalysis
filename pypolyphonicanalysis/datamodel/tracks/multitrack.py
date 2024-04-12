@@ -1,18 +1,16 @@
 from typing import Iterable, Iterator
 
-from muda.deformers import median_group_delay
-
 from pypolyphonicanalysis.datamodel.tracks.track import Track
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.utils import FloatArray
+from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay
 
 
 class Multitrack:
     def __init__(self, tracks: Iterable[Track]) -> None:
         self._tracks = tuple(tracks)
 
-    def pitch_shift(self, lb: int, ub: int, n_samples: int = 5) -> Iterable["Multitrack"]:
-        voice_iterators = [track.pitch_shift(lb, ub, n_samples) for track in self._tracks]
+    def pitch_shift_range(self, lb: int, ub: int) -> Iterable["Multitrack"]:
+        voice_iterators = [track.pitch_shift_range(lb, ub) for track in self._tracks]
         for iterators in zip(*voice_iterators):
             yield Multitrack(iterators)
 

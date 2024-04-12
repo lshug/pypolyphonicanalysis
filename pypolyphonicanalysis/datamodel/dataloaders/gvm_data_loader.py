@@ -29,12 +29,12 @@ class GVMDataLoader(BaseDataLoader):
 
     def _get_multitracks(self) -> Iterable[Multitrack]:
         corpus_path = self.get_corpus_path(self.CORPUS_NAME)
-        for song, files in self._shuffle_if_enabled(list(self._song_files_dict.items())):
+        for song, files in self._shuffle_if_enabled(sorted(self._song_files_dict.items(), key=lambda song_files: song_files[0])):
             voice_files: tuple[str, ...] = tuple([next(iter(file for file in files if f"{self._source_mix_affix}{voice_idx}M" in file)) for voice_idx in range(1, 4)])
             tracks = [
                 Track(
                     name=f"{song}_{self._source_mix_affix}{voice_idx}M",
-                    audio_source_path=corpus_path.joinpath(voice_file),
+                    audio_source=corpus_path.joinpath(voice_file),
                     settings=self._settings,
                 )
                 for voice_idx, voice_file in enumerate(voice_files, start=1)

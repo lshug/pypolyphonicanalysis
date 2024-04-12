@@ -14,7 +14,7 @@ class ESMUCSongData(NamedTuple):
 
 
 class ESMUCDataLoader(BaseDataLoader):
-    CORPUS_NAME: Final[str] = " EsmucChoirDataset_v1.0.0"
+    CORPUS_NAME: Final[str] = "EsmucChoirDataset_v1.0.0"
     # Only certain voices in each multitrack recording have dynamic mic recordings available.
     CORPUS_SONG_TAKES_AND_ENSEMBLE: Final[Mapping[str, ESMUCSongData]] = {
         "DG_FT": ESMUCSongData(4, 4, 3, 3, 2),
@@ -30,10 +30,10 @@ class ESMUCDataLoader(BaseDataLoader):
         file_string_template = "{}_take{}_{}"
         for song, song_data in self._shuffle_if_enabled(list(self.CORPUS_SONG_TAKES_AND_ENSEMBLE.items())):
             for take in self._shuffle_if_enabled(range(1, song_data.number_of_takes + 1)):
-                for soprano in [f"S{idx}" for idx in range(song_data.sopranos)]:
-                    for alto in [f"A{idx}" for idx in range(song_data.altos)]:
-                        for tenor in [f"T{idx}" for idx in range(song_data.tenors)]:
-                            for bass in [f"B{idx}" for idx in range(song_data.basses)]:
+                for soprano in [f"S{idx}" for idx in range(1, song_data.sopranos + 1)]:
+                    for alto in [f"A{idx}" for idx in range(1, song_data.altos + 1)]:
+                        for tenor in [f"T{idx}" for idx in range(1, song_data.tenors + 1)]:
+                            for bass in [f"B{idx}" for idx in range(1, song_data.basses + 1)]:
                                 tracks: list[Track] = []
                                 for voice in [soprano, alto, tenor, bass]:
                                     track_name = f"{file_string_template.format(song, take, voice)}"
@@ -41,9 +41,9 @@ class ESMUCDataLoader(BaseDataLoader):
                                     f0_filename = f"{track_name}.f0"
                                     voice_track = Track(
                                         name=track_name,
-                                        audio_source_path=corpus_path.joinpath(wav_filename),
+                                        audio_source=corpus_path.joinpath(wav_filename),
                                         settings=self._settings,
-                                        f0_source_path=corpus_path.joinpath(f0_filename),
+                                        f0_source=corpus_path.joinpath(f0_filename),
                                     )
                                     tracks.append(voice_track)
                                 yield Multitrack((tracks[0], tracks[1], tracks[2], tracks[3]))

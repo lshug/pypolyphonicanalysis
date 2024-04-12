@@ -1,9 +1,7 @@
 import itertools
 import json
 import logging
-import math
 import os
-from collections import defaultdict
 from pathlib import Path
 from typing import Sequence
 
@@ -40,7 +38,6 @@ from pypolyphonicanalysis.utils.utils import (
     save_f0_trajectories_csv,
     check_output_path,
     save_reconstructed_audio,
-    convert_times_and_freqs_arrays_to_lists,
     plot_predictions,
     get_random_state,
 )
@@ -104,7 +101,7 @@ class AutomaticAnalysisRunner:
     def _save_f0s(
         self,
         times: FloatArray,
-        freqs: list[FloatArray],
+        freqs: FloatArray,
         recording: Recording,
         stage: str,
     ) -> None:
@@ -112,19 +109,16 @@ class AutomaticAnalysisRunner:
         save_f0_trajectories_csv(self._output_path.joinpath(f"{name_prefix}.csv"), times.tolist(), freqs)
         plot_predictions(times, freqs, name_prefix, self._output_path, self._settings.default_figsize)
 
-    def _get_harmonic_intervals(self, freqs: list[FloatArray], name: str) -> list[float]:
-        harmonic_intervals: list[float] = []
-        for freq_array in freqs:
-            cents_above_a1_list = [1200 * math.log(f0 / librosa.note_to_hz("A1"), 2) for f0 in freq_array if f0 != 0]
-            for idx, cents_current in enumerate(cents_above_a1_list):
-                for cents_other in cents_above_a1_list[idx + 1 :]:
-                    interval = cents_other - cents_current
-                    if self._settings.squeeze_harmonic_intervals_into_one_octave:
-                        interval %= 1200
-                    harmonic_intervals.append(interval)
-
+    def _get_harmonic_intervals(self, freqs: FloatArray, name: str) -> FloatArray:
+        cents_above_a1 = 1200 * np.log2(freqs / librosa.note_to_hz("A1"), out=-1 * np.inf * np.ones_like(freqs), where=freqs != 0)
+        diffs = np.diff(cents_above_a1)
+        diffs = diffs[~np.isnan(diffs)]
+        diffs = diffs[~np.isinf(diffs)]
+        if self._settings.squeeze_harmonic_intervals_into_one_octave:
+            diffs %= 1200
+        harmonic_intervals = np.reshape(diffs, -1)
         json.dump(
-            harmonic_intervals,
+            harmonic_intervals.tolist(),
             open(
                 self._output_path.joinpath(f"{name}_harmonic_intervals.json"),
                 "w",
@@ -134,7 +128,7 @@ class AutomaticAnalysisRunner:
 
     def _export_harmonic_interval_distribution_plots_and_files(
         self,
-        harmonic_intervals: list[float],
+        harmonic_intervals: FloatArray,
         kde: KernelDensity,
         gmm: GaussianMixture,
         ground_truth_gmm: GaussianMixture | None,
@@ -188,15 +182,13 @@ class AutomaticAnalysisRunner:
 
         self._save_gmm_parameters(weights_means_and_vars, name)
 
-    def _model_harmonic_interval_distribution(self, harmonic_intervals: list[float], name: str) -> tuple[GaussianMixture, KernelDensity, list[tuple[float, float, float]]]:
+    def _model_harmonic_interval_distribution(self, harmonic_intervals: FloatArray, name: str) -> tuple[GaussianMixture, KernelDensity, list[tuple[float, float, float]]]:
         if len(harmonic_intervals) == 0:
             logger.warning(f"No harmonic intervals found in {name}")
             return GaussianMixture(), KernelDensity(), [(0, 0, 0)]
-        x = np.linspace(min(harmonic_intervals), max(harmonic_intervals), 1000).reshape(-1, 1)
-
-        harmonic_intervals_array = np.array(harmonic_intervals).reshape(-1, 1)
+        x = np.linspace(np.min(harmonic_intervals), np.max(harmonic_intervals), 1000).reshape(-1, 1)
         kde = KernelDensity(bandwidth=self._settings.density_estimation_bandwidth, kernel="gaussian")
-        kde.fit(harmonic_intervals_array)
+        kde.fit(harmonic_intervals)
         density_values = np.exp(kde.score_samples(x))
         peaks, _ = find_peaks(
             density_values,
@@ -210,7 +202,7 @@ class AutomaticAnalysisRunner:
             return GaussianMixture(), KernelDensity(), [(0, 0, 0)]
 
         gmm = GaussianMixture(n_components=peak_number, random_state=get_random_state(self._settings))
-        gmm.fit(harmonic_intervals_array)
+        gmm.fit(harmonic_intervals)
         weights_means_and_vars = sorted(
             list(
                 zip(
@@ -262,25 +254,22 @@ class AutomaticAnalysisRunner:
                 track = Track(track_name, ground_truth_file, self._settings)
                 unsaved_tracks.append(track)
             tracks.append(track)
-        time_f0s_dict: dict[float, list[float]] = defaultdict(list)
-        for track in tracks:
-            f0_freqs = {time: event["frequency"] for time, event in dict(np.array(track.f0_trajectory_annotation.annotations[0].data)[:, [0, 2]].tolist()).items()}
-            for time, freq in f0_freqs.items():
-                time_f0s_dict[time].append(freq)
-        freqs = [np.array(sorted(freqs)).astype(np.float32) for freqs in time_f0s_dict.values()]
-        harmonic_intervals = self._get_harmonic_intervals(freqs, name)
+        freq_array = np.stack([track.f0_trajectory_annotation[1] for track in tracks])
+        np.sort(freq_array, 1)
+        harmonic_intervals = self._get_harmonic_intervals(freq_array, name)
         gmm, _, _ = self._model_harmonic_interval_distribution(harmonic_intervals, name)
         try:
             check_is_fitted(gmm)
         except NotFittedError:
             gmm = None
-        for track in unsaved_tracks:
-            track.save()
+        if self._settings.save_raw_training_data:
+            for track in unsaved_tracks:
+                track.save()
         return gmm
 
     def _analyze_recording(self, recording: Recording) -> tuple[
-        tuple[list[float], list[list[float]]],
-        list[float],
+        tuple[FloatArray, FloatArray],
+        FloatArray,
         list[tuple[float, float, float]],
     ]:
         logger.info(f"Analyzing recording {recording.name}")
@@ -324,9 +313,8 @@ class AutomaticAnalysisRunner:
             [mean for _, mean, _ in gaussian_mixture_weights_means_variances],
             recording.name,
         )
-        recording_f0s = convert_times_and_freqs_arrays_to_lists(times, freqs)
         return (
-            recording_f0s,
+            (times, freqs),
             harmonic_intervals,
             gaussian_mixture_weights_means_variances,
         )
@@ -546,8 +534,8 @@ class AutomaticAnalysisRunner:
                 harmonic_intervals,
                 gaussian_mixture_weights_means_variances,
             ) = self._analyze_recording(recording)
-            recording_f0s_dict[recording] = recording_f0s
-            recording_harmonic_intervals_dict[recording] = harmonic_intervals
+            recording_f0s_dict[recording] = (recording_f0s[0].tolist(), [[val for val in row if val > 0] for row in recording_f0s[1].tolist()])
+            recording_harmonic_intervals_dict[recording] = harmonic_intervals.tolist()
             recording_gaussian_mixture_weights_means_variances[recording] = gaussian_mixture_weights_means_variances
         gmm_parameters = list(recording_gaussian_mixture_weights_means_variances.values())
         samples: list[list[float]]

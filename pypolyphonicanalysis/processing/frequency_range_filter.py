@@ -10,19 +10,12 @@ class FrequencyRangeFilter(BaseProcessor):
         self._upper_bound = upper_bound
         super().__init__()
 
-    def process(self, times: FloatArray, freqs: list[FloatArray]) -> F0TimesAndFrequencies:
-        new_times: list[float] = []
-        new_freqs: list[FloatArray] = []
-        for time, freq_array in zip(times, freqs):
-            new_freq_array_list: list[float] = []
-            for freq in freq_array:
-                if freq > self._lower_bound and freq < self._upper_bound:
-                    new_freq_array_list.append(freq)
-            if len(new_freq_array_list) > 0:
-                new_freq_array = np.array(freq_array).astype(np.float32)
-                new_times.append(time)
-                new_freqs.append(new_freq_array)
-        return np.array(new_times), new_freqs
+    def process(self, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
+        new_freqs = freqs.copy()
+        new_freqs[new_freqs < self._lower_bound] = 0
+        new_freqs[new_freqs > self._upper_bound] = 0
+        valid_idxs = np.any(new_freqs > 0, 1)
+        return times[valid_idxs], new_freqs[valid_idxs]
 
     def get_stage_name(self) -> str:
         return f"frequency_range_filter_{self._lower_bound}_{self._upper_bound}"

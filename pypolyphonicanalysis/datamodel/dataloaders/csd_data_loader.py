@@ -21,9 +21,9 @@ class CSDDataloader(BaseDataLoader):
                     [
                         Track(
                             name=track_string_template.format(voice, idx),
-                            audio_source_path=corpus_path.joinpath(wav_template.format(voice, idx)),
+                            audio_source=corpus_path.joinpath(wav_template.format(voice, idx)),
                             settings=self._settings,
-                            f0_source_path=corpus_path.joinpath(f0_template.format(voice, idx)),
+                            f0_source=corpus_path.joinpath(f0_template.format(voice, idx)),
                         )
                         for idx in self._shuffle_if_enabled(range(1, 5))
                     ]

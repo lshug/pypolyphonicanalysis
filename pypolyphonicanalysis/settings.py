@@ -8,6 +8,8 @@ class Settings(BaseSettings):
     random_seed: int = Field(default=123)
     test_validation_size: PositiveFloat = Field(default=0.2, le=1.0)
     validation_proportion: PositiveFloat = Field(default=0.5, le=1.0)
+    save_raw_training_data: bool = True
+    save_training_features: bool = True
     inference_batch_size: int = 4
     training_batch_size: int = 1
 

@@ -10,6 +10,7 @@ from pypolyphonicanalysis.datamodel.features.feature_store import (
     FeatureStore,
 )
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature
+from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
 
@@ -80,4 +81,8 @@ class BaseMultipleF0EstimationModel:
 
     def predict_on_file(self, file: Path) -> FloatArray:
         input_feature_arrays = [self._feature_store.generate_or_load_feature_for_file(file, feature) for feature in self.model_input_features]
+        return self.predict_on_feature_arrays(input_feature_arrays)
+
+    def predict_on_sum_track(self, sum_track: SumTrack) -> FloatArray:
+        input_feature_arrays = [self._feature_store.generate_or_load_feature_for_sum_track(sum_track, feature) for feature in self.model_input_features]
         return self.predict_on_feature_arrays(input_feature_arrays)

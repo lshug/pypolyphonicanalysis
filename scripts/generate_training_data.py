@@ -28,23 +28,23 @@ shuffle = True
 
 feature_store = FeatureStore(settings)
 dataset_loaders: list[BaseDataLoader] = [
-    CSDDataloader(shuffle, settings, maxlen=5),
-    GVMDataLoader(shuffle, settings, maxlen=5),
-    DCSDataLoader(shuffle, settings, maxlen=5),
-    ESMUCDataLoader(shuffle, settings, maxlen=5),
-    RecombinationDataLoader([MUSDBDataLoader(True, settings, maxlen=5), MUSDBDataLoader(True, settings, maxlen=5)], settings, maxlen=5),
+    CSDDataloader(shuffle, settings, maxlen=3),
+    GVMDataLoader(shuffle, settings, maxlen=3),
+    DCSDataLoader(shuffle, settings, maxlen=3),
+    ESMUCDataLoader(shuffle, settings, maxlen=3),
+    RecombinationDataLoader([MUSDBDataLoader(True, settings, maxlen=3), MUSDBDataLoader(True, settings, maxlen=3)], settings, maxlen=3),
 ]
 summing_strategies: list[BaseSummingStrategy] = [
     DirectSum(settings),
     ReverbSum(settings),
-    RoomSimulationSum(settings, (10, 7.5, 3.5), (2.5, 3.73, 1.76), [(6.3, 4.8, 1.2), (6.3, 4.87, 1.2), (6.3, 4.93, 1.2), (6.3, 5, 1.2), (6.3, 5.08, 1.2)]),
+    RoomSimulationSum(settings, (10, 7.5, 3.5), (2.5, 3.73, 1.76), [(4, 4.6, 1.6), (4.5, 4.8, 1.8), (5, 4.85, 1.7), (5.5, 4.8, 1.6), (6, 4.6, 1.9)], rt60=1.0, max_rand_disp=0.5),
 ]
 training_datapoint_names: list[str] = []
 
 
 def generate_training_points_with_augmentations(multitrack: Multitrack) -> list[str]:
     training_datapoint_names: list[str] = []
-    for augmented_multitrack in [multitrack]: #: multitrack.pitch_shift(-1, 1):
+    for augmented_multitrack in multitrack.pitch_shift_range(-1, 1):
         for summing_strategy in summing_strategies:
             if summing_strategy.is_summable(augmented_multitrack):
                 training_datapoint = summing_strategy.sum_or_retrieve(augmented_multitrack)
@@ -54,26 +54,16 @@ def generate_training_points_with_augmentations(multitrack: Multitrack) -> list[
 
 
 def dump_train_metadata(training_datapoint_names: list[str]) -> None:
-    train_points, test_validation_points = train_test_split(
-        training_datapoint_names,
-        test_size=settings.test_validation_size,
-        random_state=settings.random_seed,
-    )
-    test_points, validation_points = train_test_split(
-        test_validation_points,
-        test_size=settings.validation_proportion,
-        random_state=settings.random_seed,
-    )
+    train_points, test_validation_points = train_test_split(training_datapoint_names, test_size=settings.test_validation_size, random_state=settings.random_seed)
+    test_points, validation_points = train_test_split(test_validation_points, test_size=settings.validation_proportion, random_state=settings.random_seed)
     training_metadata = Path(settings.data_directory_path).joinpath("training_metadata")
     training_metadata.mkdir(parents=True, exist_ok=True)
-    json.dump(
-        {"train": train_points, "test": test_points, "validation": validation_points},
-        open(training_metadata.joinpath("train_test_validation_split.json"), "w"),
-    )
+    json.dump({"train": train_points, "test": test_points, "validation": validation_points}, open(training_metadata.joinpath("train_test_validation_split.json"), "w"), indent=4)
 
 
-for dataset_loader in dataset_loaders:
+for dataset_loader in tqdm(dataset_loaders):
+    print(type(dataset_loader))
     multitrack_iterator = tqdm(dataset_loader.get_multitracks(), total=len(dataset_loader))
-    for datapoint_names in Parallel(n_jobs=1, verbose=5)(delayed(generate_training_points_with_augmentations)(multitrack) for multitrack in multitrack_iterator):
+    for datapoint_names in Parallel(n_jobs=32, verbose=5)(delayed(generate_training_points_with_augmentations)(multitrack) for multitrack in multitrack_iterator):
         training_datapoint_names.extend(datapoint_names)
         dump_train_metadata(training_datapoint_names)
