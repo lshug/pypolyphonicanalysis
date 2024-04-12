@@ -33,6 +33,7 @@ pyroomacoustics = "^0.7.3"
 setuptools = "^69.2.0"
 torch = "^2.2.2"
 pyrubberband = "^0.3.0"
+torchdata = "^0.7.1"
 
 
 [tool.poetry.group.dev.dependencies]

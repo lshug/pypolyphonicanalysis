@@ -170,6 +170,12 @@ class Track:
                 f0[idx] = 0
         return times, f0
 
+    def trim_to_frames(self, n_frames: int) -> "Track":
+        n_samples = n_frames * self._settings.hop_length
+        return Track(
+            f"{self.name}_trim_{n_frames}", self.audio_array[:n_samples], self._settings, (self.f0_trajectory_annotation[0][:n_frames], self.f0_trajectory_annotation[1][:n_frames])
+        )
+
     def __repr__(self) -> str:
         return f"Track({self.name})"
 
