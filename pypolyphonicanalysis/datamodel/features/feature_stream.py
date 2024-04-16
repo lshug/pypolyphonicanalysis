@@ -1,17 +1,18 @@
 import numpy as np
 
 from pypolyphonicanalysis.datamodel.features.feature_store import FeatureStore
-from pypolyphonicanalysis.datamodel.features.features import InputFeature
+from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray, get_random_state
 
 
 class FeatureStream:
-    def __init__(self, sum_track: SumTrack, input_features: list[InputFeature], settings: Settings) -> None:
+    def __init__(self, sum_track: SumTrack, input_features: list[InputFeature], label_features: list[LabelFeature], settings: Settings) -> None:
         self._sum_track = sum_track
         self._settings = settings
         self._input_features = input_features
+        self._label_features = label_features
         self._batch_size = settings.training_batch_size
         self._number_of_slices = settings.training_input_number_of_slices
         self._feature_store = FeatureStore(settings)
@@ -22,7 +23,7 @@ class FeatureStream:
 
     def __next__(self) -> tuple[list[FloatArray], list[FloatArray]]:
         input_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._input_features]
-        label_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._input_features]
+        label_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._label_features]
         n_t = input_feature_arrs[0].shape[-1]
         input_slices_list = []
         label_slices_batch = []
