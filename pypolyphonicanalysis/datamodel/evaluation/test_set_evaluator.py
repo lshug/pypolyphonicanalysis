@@ -53,12 +53,10 @@ class TestSetEvaluator:
                 predicted_salience_map = model.predict_on_sum_track(sum_track)
                 gt_times, gt_freqs = get_estimated_times_and_frequencies_from_salience_map(
                     ground_truth_salience_map,
-                    self._settings.threshold,
                     settings=self._settings,
                 )
                 pred_times, pred_freqs = get_estimated_times_and_frequencies_from_salience_map(
                     predicted_salience_map,
-                    self._settings.threshold,
                     settings=self._settings,
                 )
                 save_reconstructed_audio(gt_times, gt_freqs, f"ground_truth_{sum_track.name}", evaluation_path, settings=self._settings)

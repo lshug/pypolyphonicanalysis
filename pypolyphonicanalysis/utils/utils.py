@@ -83,7 +83,6 @@ def median_group_delay(y: FloatArray, sr: int, n_fft: int = 2048, rolloff_value:
 
 def get_estimated_times_and_frequencies_from_salience_map(
     pitch_activation_mat: FloatArray,
-    thresh: float,
     settings: Settings,
     remove_negatives: bool = False,
 ) -> F0TimesAndFrequencies:
@@ -99,21 +98,18 @@ def get_estimated_times_and_frequencies_from_salience_map(
     peaks = scipy.signal.argrelmax(pitch_activation_mat, axis=0)
     peak_thresh_mat[peaks] = pitch_activation_mat[peaks]
 
-    idx = np.where(peak_thresh_mat >= thresh)
+    idx = np.where(peak_thresh_mat >= settings.threshold)
     est_freqs: list[list[float]] = [[] for _ in range(len(time_grid))]
     for f, t in zip(idx[0], idx[1]):
         est_freqs[t].append(freq_grid[f])
-    est_freqs_arrays = [np.array(lst) for lst in est_freqs]
+    est_freqs_arrays: list[FloatArray] = [np.array(lst) for lst in est_freqs]
     if remove_negatives:
-        for i, (tms, fqs) in enumerate(zip(time_grid, est_freqs_arrays)):
-            if any(fqs <= 0):
-                est_freqs_arrays[i] = np.array([f for f in fqs if f > 0])
-
+        for arr_idx in range(len(est_freqs_arrays)):
+            est_freqs_arrays[arr_idx] = est_freqs_arrays[arr_idx][est_freqs_arrays[arr_idx] > 0]
     max_len = max([arr.shape[0] for arr in est_freqs_arrays])
     freqs = np.zeros((len(est_freqs_arrays), max_len)).astype(np.float32)
-    for arr_idx, arr in est_freqs_arrays:
+    for arr_idx, arr in enumerate(est_freqs_arrays):
         freqs[arr_idx][(max_len - arr.shape[0]) :] = arr
-
     return time_grid, freqs
 
 
@@ -131,10 +127,6 @@ def get_voice_times_and_f0s_from_csv(filename: str) -> dict[int, dict[float, flo
         for time in times:
             voices[voice].setdefault(time, 0)
     return voices
-
-
-def get_voice_times_and_f0s_from_times_and_freqs(times: FloatArray, freqs: FloatArray) -> dict[int, dict[float, float]]:
-    raise
 
 
 def sonify_trajectory_with_sinusoid(traj: FloatArray, sr: int = 44100, amplitude: float = 0.3, smooth_len: int = 11) -> FloatArray:

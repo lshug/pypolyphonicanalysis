@@ -14,10 +14,8 @@ class Multitrack:
         min_frames = min(track.n_frames for track in self._tracks)
         self._tracks = tuple([track.trim_to_frames(min_frames) for track in self._tracks])
 
-    def pitch_shift_range(self, lb: int, ub: int) -> Iterable["Multitrack"]:
-        voice_iterators = [track.pitch_shift_range(lb, ub) for track in self._tracks]
-        for iterators in zip(*voice_iterators):
-            yield Multitrack(iterators)
+    def pitch_shift(self, n_steps: float) -> "Multitrack":
+        return Multitrack([track.pitch_shift(n_steps) for track in self._tracks])
 
     def time_shift_by_ir(self, ir: FloatArray, settings: Settings) -> "Multitrack":
         delay = median_group_delay(ir, settings.sr)

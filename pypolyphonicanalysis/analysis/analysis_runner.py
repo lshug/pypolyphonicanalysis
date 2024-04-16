@@ -2,6 +2,7 @@ import itertools
 import json
 import logging
 import os
+import warnings
 from pathlib import Path
 from typing import Sequence
 
@@ -27,7 +28,7 @@ from pypolyphonicanalysis.datamodel.tracks.track import (
     load_track,
     Track,
 )
-from pypolyphonicanalysis.processing.base_processor import BaseProcessor
+from pypolyphonicanalysis.processing.f0.base_f0_processor import BaseF0Processor
 from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import (
     BaseMultipleF0EstimationModel,
 )
@@ -80,7 +81,7 @@ class AutomaticAnalysisRunner:
         self,
         output_path: Path,
         model: BaseMultipleF0EstimationModel,
-        processors: Sequence[BaseProcessor],
+        processors: Sequence[BaseF0Processor],
         settings: Settings,
         activation_cache: Path | None = None,
     ) -> None:
@@ -111,12 +112,15 @@ class AutomaticAnalysisRunner:
 
     def _get_harmonic_intervals(self, freqs: FloatArray, name: str) -> FloatArray:
         cents_above_a1 = 1200 * np.log2(freqs / librosa.note_to_hz("A1"), out=-1 * np.inf * np.ones_like(freqs), where=freqs != 0)
-        diffs = np.diff(cents_above_a1)
-        diffs = diffs[~np.isnan(diffs)]
-        diffs = diffs[~np.isinf(diffs)]
-        if self._settings.squeeze_harmonic_intervals_into_one_octave:
-            diffs %= 1200
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", "invalid value encountered in subtract")
+            diffs = np.diff(cents_above_a1)
         harmonic_intervals = np.reshape(diffs, -1)
+        harmonic_intervals = harmonic_intervals[~np.isnan(harmonic_intervals)]
+        harmonic_intervals = harmonic_intervals[~np.isinf(harmonic_intervals)]
+        if self._settings.squeeze_harmonic_intervals_into_one_octave:
+            harmonic_intervals %= 1200
+            harmonic_intervals = harmonic_intervals[harmonic_intervals != 0]
         json.dump(
             harmonic_intervals.tolist(),
             open(
@@ -135,8 +139,7 @@ class AutomaticAnalysisRunner:
         name: str,
     ) -> None:
         plt.figure(figsize=self._settings.default_figsize)
-        x = np.linspace(min(harmonic_intervals), max(harmonic_intervals), 1000).reshape(-1, 1)
-        density_values = np.exp(kde.score_samples(x))
+        x = np.linspace(np.max([np.min(harmonic_intervals), 1]), np.max(harmonic_intervals), 1000).reshape(-1, 1)
         plt.hist(
             harmonic_intervals,
             bins=self._settings.histogram_bins,
@@ -145,7 +148,7 @@ class AutomaticAnalysisRunner:
             color="blue",
             label="Histogram",
         )
-        plt.plot(x, density_values, color="red", label="Kernel Density Estimation")
+        plt.plot(x, np.exp(kde.score_samples(x)), color="red", label="Kernel Density Estimation")
         plt.plot(
             x,
             np.exp(gmm.score_samples(x)),
@@ -186,12 +189,11 @@ class AutomaticAnalysisRunner:
         if len(harmonic_intervals) == 0:
             logger.warning(f"No harmonic intervals found in {name}")
             return GaussianMixture(), KernelDensity(), [(0, 0, 0)]
-        x = np.linspace(np.min(harmonic_intervals), np.max(harmonic_intervals), 1000).reshape(-1, 1)
+        x = np.linspace(np.max([np.min(harmonic_intervals), 1]), np.max(harmonic_intervals), 1000).reshape(-1, 1)
         kde = KernelDensity(bandwidth=self._settings.density_estimation_bandwidth, kernel="gaussian")
-        kde.fit(harmonic_intervals)
-        density_values = np.exp(kde.score_samples(x))
+        kde.fit(harmonic_intervals.reshape(-1, 1))
         peaks, _ = find_peaks(
-            density_values,
+            np.exp(kde.score_samples(x)),
             height=0,
             distance=self._settings.peak_finding_minimum_cent_distance,
         )
@@ -202,7 +204,7 @@ class AutomaticAnalysisRunner:
             return GaussianMixture(), KernelDensity(), [(0, 0, 0)]
 
         gmm = GaussianMixture(n_components=peak_number, random_state=get_random_state(self._settings))
-        gmm.fit(harmonic_intervals)
+        gmm.fit(harmonic_intervals.reshape(-1, 1))
         weights_means_and_vars = sorted(
             list(
                 zip(
@@ -254,8 +256,8 @@ class AutomaticAnalysisRunner:
                 track = Track(track_name, ground_truth_file, self._settings)
                 unsaved_tracks.append(track)
             tracks.append(track)
-        freq_array = np.stack([track.f0_trajectory_annotation[1] for track in tracks])
-        np.sort(freq_array, 1)
+        freq_array = np.stack([track.f0_trajectory_annotation[1] for track in tracks]).transpose()
+        freq_array = np.sort(freq_array, 1)
         harmonic_intervals = self._get_harmonic_intervals(freq_array, name)
         gmm, _, _ = self._model_harmonic_interval_distribution(harmonic_intervals, name)
         try:
@@ -285,7 +287,7 @@ class AutomaticAnalysisRunner:
                 )
         else:
             initial_f0s = self._estimate_recording_f0s(recording)
-        times, freqs = get_estimated_times_and_frequencies_from_salience_map(initial_f0s, self._settings.threshold, self._settings, True)
+        times, freqs = get_estimated_times_and_frequencies_from_salience_map(initial_f0s, self._settings, True)
         json.dump(
             json.loads(recording.metadata_json),
             open(
@@ -325,7 +327,7 @@ class AutomaticAnalysisRunner:
         name: str,
         safe_filename_prefix: str,
     ) -> tuple[GaussianMixture, KernelDensity, list[tuple[float, float, float]]]:
-        x = np.linspace(0, 1300, 1000).reshape(-1, 1)
+        x = np.linspace(1, 1300, 1000).reshape(-1, 1)
         plt.figure(figsize=self._settings.default_figsize)
         combined_weights: list[float] = []
         combined_means: list[float] = []
@@ -338,16 +340,16 @@ class AutomaticAnalysisRunner:
             combined_means.extend(means)
             combined_vars.extend(vars)
             cov = np.array(vars).reshape(-1, 1, 1)
-            concatenated_gmm = GaussianMixture(
+            single_gmm = GaussianMixture(
                 n_components=len(means),
                 covariance_type="full",
                 random_state=get_random_state(self._settings),
             )
-            concatenated_gmm.means_ = np.array(means).reshape(-1, 1)
-            concatenated_gmm.covariances_ = cov
-            concatenated_gmm.weights_ = weights
-            concatenated_gmm.precisions_cholesky_ = np.linalg.cholesky(np.linalg.inv(cov))
-            plt.plot(x, np.exp(concatenated_gmm.score_samples(x.reshape(-1, 1))))
+            single_gmm.means_ = np.array(means).reshape(-1, 1)
+            single_gmm.covariances_ = cov
+            single_gmm.weights_ = weights
+            single_gmm.precisions_cholesky_ = np.linalg.cholesky(np.linalg.inv(cov))
+            plt.plot(x, np.exp(single_gmm.score_samples(x.reshape(-1, 1))))
         plt.xlabel("Values")
         plt.ylabel("Density")
         plt.suptitle("Harmonic interval distributions (estimated Gaussian Mixtures)")

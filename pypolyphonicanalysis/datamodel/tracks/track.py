@@ -29,6 +29,9 @@ def load_f0_trajectory_array_from_path(path: Path) -> tuple[FloatArray, FloatArr
         case ".f0":
             arr = np.array(np.loadtxt(path, dtype=np.float32))
             return arr[:, 0], arr[:, 1]
+        case ".npy":
+            arr = np.load(path).astype(np.float32)
+            return arr[:, 0], arr[:, 1]
         case _:
             raise ValueError(f"Format {path.suffix} is not supported.")
 
@@ -49,7 +52,7 @@ def load_track(track_name: str, settings: Settings) -> "Track":
         track_name,
         Path(track_data["audio_source_path"]),
         settings,
-        track_path.joinpath("f0_trajectory_annotation.f0"),
+        track_path.joinpath("f0_trajectory_annotation.npy"),
     )
 
 
@@ -109,8 +112,8 @@ class Track:
         tracks_path = get_tracks_path(self._settings)
         track_path = tracks_path.joinpath(self.name)
         track_path.mkdir(parents=True, exist_ok=True)
-        time_freq_arr = np.stack(self.f0_trajectory_annotation)
-        np.savetxt(track_path.joinpath("f0_trajectory_annotation.f0").absolute().as_posix(), time_freq_arr)
+        time_freq_arr = np.stack(self.f0_trajectory_annotation).transpose()
+        np.save(track_path.joinpath("f0_trajectory_annotation.npy").absolute().as_posix(), time_freq_arr)
         source_path: str
         match self._audio_source:
             case Path():
@@ -123,13 +126,15 @@ class Track:
         with open(track_path.joinpath(".saved"), "a"):
             os.utime(track_path.joinpath(".saved"), None)
 
-    def pitch_shift(self, semitones: int) -> "Track":
-        shift_suffix = f"pitch_shift_{semitones}_"
+    def pitch_shift(self, n_steps: float) -> "Track":
+        if n_steps == 0:
+            return self
+        shift_suffix = f"pitch_shift_{n_steps}_"
         track_name = f"{shift_suffix}{self._name}"
         if track_is_saved(track_name, self._settings):
             return load_track(track_name, self._settings)
-        audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, semitones)
-        frequency_multiplier = 2 ** (semitones / 12)
+        audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, n_steps)
+        frequency_multiplier = 2 ** (n_steps / 12)
         times, freqs = self.f0_trajectory_annotation
         freqs = freqs * frequency_multiplier
         return Track(track_name, audio_array, self._settings, (times, freqs))

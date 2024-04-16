@@ -48,6 +48,7 @@ class HCQTMagPhaseDiffGenerator(InputFeatureGenerator):
                 over_sample=self._settings.over_sample,
                 harmonics=self._settings.harmonics,
                 log=True,
+                conv="channels_first",
             )
         )
 
@@ -55,29 +56,26 @@ class HCQTMagPhaseDiffGenerator(InputFeatureGenerator):
     def number_of_features(self) -> int:
         return 2
 
-    def _generate_hcqt_features_from_path(self, path: Path) -> list[FloatArray]:
-        hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(path.absolute().as_posix())
-        mag = hcqt_data["hcqt_phase_diff/mag"][0]  # (t, bins, harmonics)
+    def _generate_hcqt_features_from_pump(self, file: Path | None = None, y: FloatArray | None = None) -> list[FloatArray]:
+        if file is None and y is None:
+            raise ValueError("No input file or array provided for generating features from pump")
+        if file is None:
+            hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(y=y, sr=self._settings.sr)
+        else:
+            hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(file.absolute().as_posix())
+        mag = hcqt_data["hcqt_phase_diff/mag"][0]
+        phase_diff = hcqt_data["hcqt_phase_diff/dphase"][0]
         assert isinstance(mag, np.ndarray)
-        hcqt_phase_diff = hcqt_data["hcqt_phase_diff/dphase"][0]  # (t, bins, harmonics)
-        assert isinstance(hcqt_phase_diff, np.ndarray)
-        return [mag, hcqt_phase_diff]
+        assert isinstance(phase_diff, np.ndarray)
+        mag = mag.transpose(0, 2, 1)
+        phase_diff = phase_diff.transpose(0, 2, 1)
+        return [mag, phase_diff]
 
     def generate_features_for_sum_track(self, sum_track: SumTrack) -> list[FloatArray]:
-        hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(y=sum_track.audio_array, sr=self._settings.sr)
-        mag = hcqt_data["hcqt_phase_diff/mag"][0]  # (t, bins, harmonics)
-        assert isinstance(mag, np.ndarray)
-        hcqt_phase_diff = hcqt_data["hcqt_phase_diff/dphase"][0]  # (t, bins, harmonics)
-        assert isinstance(hcqt_phase_diff, np.ndarray)
-        return [mag, hcqt_phase_diff]
+        return self._generate_hcqt_features_from_pump(y=sum_track.audio_array)
 
     def generate_features_for_file(self, file: Path) -> list[FloatArray]:
-        hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(file.absolute().as_posix())
-        mag = hcqt_data["hcqt_phase_diff/mag"][0]  # (t, bins, harmonics)
-        assert isinstance(mag, np.ndarray)
-        hcqt_phase_diff = hcqt_data["hcqt_phase_diff/dphase"][0]  # (t, bins, harmonics)
-        assert isinstance(hcqt_phase_diff, np.ndarray)
-        return [mag, hcqt_phase_diff]
+        return self._generate_hcqt_features_from_pump(file)
 
 
 class SalienceMapGenerator(LabelFeatureGenerator):

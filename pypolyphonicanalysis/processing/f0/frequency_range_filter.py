@@ -1,10 +1,10 @@
 import numpy as np
 
-from pypolyphonicanalysis.processing.base_processor import BaseProcessor
+from pypolyphonicanalysis.processing.f0.base_f0_processor import BaseF0Processor
 from pypolyphonicanalysis.utils.utils import FloatArray, F0TimesAndFrequencies
 
 
-class FrequencyRangeFilter(BaseProcessor):
+class FrequencyRangeFilter(BaseF0Processor):
     def __init__(self, lower_bound: float, upper_bound: float) -> None:
         self._lower_bound = lower_bound
         self._upper_bound = upper_bound

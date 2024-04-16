@@ -4,7 +4,7 @@ from abc import abstractmethod
 from pypolyphonicanalysis.utils.utils import FloatArray, F0TimesAndFrequencies
 
 
-class BaseProcessor(abc.ABC):
+class BaseF0Processor(abc.ABC):
     @abstractmethod
     def process(self, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
         """

@@ -12,7 +12,6 @@ pydantic = "2.6.4"
 pydantic-settings = "2.2.0"
 tqdm = "4.66.2"
 types-tqdm = "4.66.0"
-requests = "2.31.0"
 types-requests = "2.31.0.20240406"
 librosa = "0.10.1"
 matplotlib = "3.8.4"
@@ -42,6 +41,7 @@ ruff = "^0.3.5"
 mypy = "^1.9.0"
 pip = "^24.0"
 tensorboard = "^2.16.2"
+requests = "2.31.0"
 
 
 

@@ -44,7 +44,7 @@ training_datapoint_names: list[str] = []
 
 def generate_training_points_with_augmentations(multitrack: Multitrack) -> list[str]:
     training_datapoint_names: list[str] = []
-    for augmented_multitrack in multitrack.pitch_shift_range(-1, 1):
+    for augmented_multitrack in [multitrack]:
         for summing_strategy in summing_strategies:
             if summing_strategy.is_summable(augmented_multitrack):
                 training_datapoint = summing_strategy.sum_or_retrieve(augmented_multitrack)

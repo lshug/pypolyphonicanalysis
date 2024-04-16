@@ -8,12 +8,16 @@ class Settings(BaseSettings):
     random_seed: int = Field(default=123)
     test_validation_size: PositiveFloat = Field(default=0.2, le=1.0)
     validation_proportion: PositiveFloat = Field(default=0.5, le=1.0)
+
     save_raw_training_data: bool = True
     save_training_features: bool = True
-    inference_batch_size: int = 4
-    training_batch_size: int = 1
+    save_prediction_file_features: bool = True
 
-    input_number_of_slices: int = 5000
+    inference_batch_size: int = 4
+    inference_input_number_of_slices: int = 5000
+    training_batch_size: int = 128
+    training_input_number_of_slices: int = 50
+
     bins_per_octave: PositiveInt = Field(default=60)
     n_octaves: PositiveInt = Field(default=6)
     over_sample: PositiveInt = Field(default=5)
@@ -32,5 +36,3 @@ class Settings(BaseSettings):
     peak_finding_minimum_cent_distance: float = 50
     squeeze_harmonic_intervals_into_one_octave: bool = True
     clustering_distance_threshold: float = 30
-
-    cache_prediction_file_features: bool = True
