@@ -1,7 +1,8 @@
 from collections import Counter
 from typing import Iterator
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider, SumTrackSplitType
+from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
+from pypolyphonicanalysis.datamodel.data_multiplexing.splits import SumTrackSplitType
 from pypolyphonicanalysis.datamodel.features.feature_stream import FeatureStream
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack

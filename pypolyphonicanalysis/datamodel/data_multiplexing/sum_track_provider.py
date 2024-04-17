@@ -1,8 +1,9 @@
 from enum import Enum
-from typing import Iterable, TypedDict, TypeVar
+from typing import Iterable, TypeVar
 
 from tqdm import tqdm
 
+from pypolyphonicanalysis.datamodel.data_multiplexing.splits import SumTrackSplitType, TrainTestValidationSplit
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
@@ -12,18 +13,6 @@ from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_random_number_generator
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 from joblib import Parallel, delayed
-
-
-class SumTrackSplitType(Enum):
-    TRAIN = 0
-    TEST = 1
-    VALIDATION = 2
-
-
-class TrainTestValidationSplit(TypedDict):
-    train: list[str]
-    test: list[str]
-    validation: list[str]
 
 
 class SummingModes(Enum):

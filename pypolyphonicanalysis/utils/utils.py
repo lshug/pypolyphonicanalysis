@@ -1,5 +1,6 @@
 import csv
 import itertools
+import json
 import os
 import random
 from collections import defaultdict
@@ -13,6 +14,7 @@ import numpy.typing as npt
 import scipy
 from matplotlib import pyplot as plt
 
+from pypolyphonicanalysis.datamodel.data_multiplexing.splits import TrainTestValidationSplit
 from pypolyphonicanalysis.settings import Settings
 
 FloatArray = npt.NDArray[np.float32]
@@ -24,6 +26,15 @@ def check_output_path(output_path: Path) -> None:
     if output_path.is_file():
         raise ValueError("Output path must be a directory")
     output_path.mkdir(parents=True, exist_ok=True)
+
+
+def get_train_test_validation_split(split_name: str, settings: Settings) -> TrainTestValidationSplit:
+    split: TrainTestValidationSplit = json.load(open(Path(settings.data_directory_path).joinpath("training_metadata").joinpath(f"{split_name}.json")))
+    return split
+
+
+def get_save_test_validation_split(split_name: str, split: TrainTestValidationSplit, settings: Settings) -> None:
+    json.dump(split, open(Path(settings.data_directory_path).joinpath("training_metadata").joinpath(f"{split_name}.json"), "w"), indent=4)
 
 
 @cache

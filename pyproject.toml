@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "pypolyphonicanalysis"
 version = "0.1.0"
-description = "Toolkit for analysis recordings of polyphonic vocal music"
+description = "Toolkit for analyzing recordings of polyphonic vocal music"
 authors = ["Levan Shugliashvili"]
 license = "MIT"
 readme = "README.md"

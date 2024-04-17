@@ -1,8 +1,8 @@
-import json
 import os
 from pathlib import Path
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider, SumTrackSplitType
+from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
+from pypolyphonicanalysis.datamodel.data_multiplexing.splits import SumTrackSplitType
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
 from pypolyphonicanalysis.datamodel.dataloaders.csd_data_loader import CSDDataloader
 from pypolyphonicanalysis.datamodel.dataloaders.dcs_data_loader import DCSDataLoader
@@ -18,8 +18,9 @@ from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbS
 from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
+from pypolyphonicanalysis.utils.utils import get_save_test_validation_split
 
-settings = Settings(test_validation_size=0.4)
+settings = Settings()
 shuffle = True
 
 monophonic_tracks_source_path = Path(settings.data_directory_path).joinpath("corpora").joinpath("monophonic_collections").joinpath("SingingVoiceDataset").joinpath("monophonic")
@@ -53,11 +54,17 @@ training_metadata = Path(settings.data_directory_path).joinpath("training_metada
 training_metadata.mkdir(parents=True, exist_ok=True)
 count = 0
 for sum_track, split in sum_track_provider.get_sum_tracks():
+    print(split)
     split_dict[split].append(sum_track.name)
     count += 1
-    if count % 100 == 0:
-        json.dump(
+    if count % 10 == 0:
+        get_save_test_validation_split(
+            "train_test_validation_split",
             {"train": split_dict[SumTrackSplitType.TRAIN], "test": split_dict[SumTrackSplitType.TEST], "validation": split_dict[SumTrackSplitType.VALIDATION]},
-            open(training_metadata.joinpath("train_test_validation_split.json"), "w"),
-            indent=4,
+            settings,
         )
+get_save_test_validation_split(
+    "train_test_validation_split",
+    {"train": split_dict[SumTrackSplitType.TRAIN], "test": split_dict[SumTrackSplitType.TEST], "validation": split_dict[SumTrackSplitType.VALIDATION]},
+    settings,
+)
