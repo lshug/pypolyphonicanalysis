@@ -1,23 +1,23 @@
 import csv
 import itertools
-import math
 import os
 import random
 from collections import defaultdict
 from functools import cache
 from pathlib import Path
-from typing import Any
+from typing import cast
 
 import librosa
 import numpy as np
+import numpy.typing as npt
 import scipy
 from matplotlib import pyplot as plt
 
 from pypolyphonicanalysis.settings import Settings
 
-FloatArray = np.ndarray[Any, np.dtype[np.float32]]
-IntArray = np.ndarray[Any, np.dtype[np.int64]]
-F0TimesAndFrequencies = tuple[FloatArray, list[FloatArray]]
+FloatArray = npt.NDArray[np.float32]
+IntArray = npt.NDArray[np.int64]
+F0TimesAndFrequencies = tuple[FloatArray, FloatArray]
 
 
 def check_output_path(output_path: Path) -> None:
@@ -36,9 +36,53 @@ def get_random_number_generator(settings: Settings) -> random.Random:
     return random.Random(settings.random_seed)
 
 
+def median_group_delay(y: FloatArray, sr: int, n_fft: int = 2048, rolloff_value: int = -24) -> float:
+    """
+    From Muda.
+    Compute the average group delay for a signal
+
+    Parameters
+    ----------
+    y : np.ndarray
+        the signal
+
+    sr : int > 0
+        the sampling rate of `y`
+
+    n_fft : int > 0
+        the FFT window size
+
+    rolloff_value : int > 0
+        If provided, only estimate the groupd delay of the passband that
+        above the threshold, which is the rolloff_value below the peak
+        on frequency response.
+
+    Returns
+    -------
+    mean_delay : float
+        The mediant group delay of `y` (in seconds)
+
+    """
+    if rolloff_value > 0:
+        # rolloff_value must be strictly negative
+        rolloff_value = -rolloff_value
+
+    # frequency response
+    _, h_ir = scipy.signal.freqz(y, a=1, worN=n_fft, whole=False, plot=None)
+
+    # convert to dB(clip function avoids the zero value in log computation)
+    power_ir = 20 * np.log10(np.clip(np.abs(h_ir), 1e-8, 1e100))
+
+    # set up threshold for valid range
+    threshold = max(power_ir) + rolloff_value
+
+    _, gd_ir = scipy.signal.group_delay((y, 1), n_fft)
+
+    return float(np.median(gd_ir[power_ir > threshold]) / sr)
+
+
 def get_estimated_times_and_frequencies_from_salience_map(
     pitch_activation_mat: FloatArray,
-    thresh: float,
     settings: Settings,
     remove_negatives: bool = False,
 ) -> F0TimesAndFrequencies:
@@ -54,19 +98,19 @@ def get_estimated_times_and_frequencies_from_salience_map(
     peaks = scipy.signal.argrelmax(pitch_activation_mat, axis=0)
     peak_thresh_mat[peaks] = pitch_activation_mat[peaks]
 
-    idx = np.where(peak_thresh_mat >= thresh)
+    idx = np.where(peak_thresh_mat >= settings.threshold)
     est_freqs: list[list[float]] = [[] for _ in range(len(time_grid))]
     for f, t in zip(idx[0], idx[1]):
         est_freqs[t].append(freq_grid[f])
-
-    est_freqs_arrays = [np.array(lst) for lst in est_freqs]
-
+    est_freqs_arrays: list[FloatArray] = [np.array(lst) for lst in est_freqs]
     if remove_negatives:
-        for i, (tms, fqs) in enumerate(zip(time_grid, est_freqs_arrays)):
-            if any(fqs <= 0):
-                est_freqs_arrays[i] = np.array([f for f in fqs if f > 0])
-
-    return time_grid, est_freqs_arrays
+        for arr_idx in range(len(est_freqs_arrays)):
+            est_freqs_arrays[arr_idx] = est_freqs_arrays[arr_idx][est_freqs_arrays[arr_idx] > 0]
+    max_len = max([arr.shape[0] for arr in est_freqs_arrays])
+    freqs = np.zeros((len(est_freqs_arrays), max_len)).astype(np.float32)
+    for arr_idx, arr in enumerate(est_freqs_arrays):
+        freqs[arr_idx][(max_len - arr.shape[0]) :] = arr
+    return time_grid, freqs
 
 
 def get_voice_times_and_f0s_from_csv(filename: str) -> dict[int, dict[float, float]]:
@@ -82,18 +126,6 @@ def get_voice_times_and_f0s_from_csv(filename: str) -> dict[int, dict[float, flo
     for voice in voices.keys():
         for time in times:
             voices[voice].setdefault(time, 0)
-    return voices
-
-
-def get_voice_times_and_f0s_from_times_and_freqs(times: FloatArray, freqs: list[FloatArray]) -> dict[int, dict[float, float]]:
-    voices: dict[int, dict[float, float]] = defaultdict(dict)
-    number_of_voices = max(len(freq_arr) for freq_arr in freqs)
-    for time, freq_array in zip(times, freqs):
-        for voice_idx in range(number_of_voices):
-            if voice_idx < len(freq_array):
-                voices[voice_idx][time] = freq_array[voice_idx]
-            else:
-                voices[voice_idx][time] = 0
     return voices
 
 
@@ -130,20 +162,20 @@ def sonify_trajectory_with_sinusoid(traj: FloatArray, sr: int = 44100, amplitude
     return x_soni
 
 
-def save_f0_trajectories_csv(path: Path, times: list[float], freqs: list[FloatArray]) -> None:
+def save_f0_trajectories_csv(path: Path, times: list[float], freqs: FloatArray) -> None:
     with open(path, "w") as f:
         csv_writer = csv.writer(f, delimiter="\t")
         time: float
         frequencies: FloatArray
         for time, frequencies in zip(times, freqs):
             row = [time]
-            row.extend(frequencies)
+            row.extend([x for x in frequencies if x > 0])
             csv_writer.writerow(row)
 
 
 def plot_predictions(
-    est_times: FloatArray,
-    est_freqs: list[FloatArray],
+    times: FloatArray,
+    freqs: FloatArray,
     name: str,
     output_path: Path,
     figsize: tuple[int, int],
@@ -153,12 +185,14 @@ def plot_predictions(
     plt.title(f"{name}, estimated F0s")
     plt.ylabel("Cents above A1")
     plt.xlabel("Time (sec)")
-    voice_times_and_f0s = get_voice_times_and_f0s_from_times_and_freqs(est_times, est_freqs)
+    freqs_per_voice = freqs.transpose()
     color_cycle = iter(itertools.cycle([".r", ".g", ".b", ".y", ".c", ".m"]))
-    for voice, times_and_f0s in voice_times_and_f0s.items():
-        times, f0s = zip(*sorted(list(times_and_f0s.items()), key=lambda time_and_f0: time_and_f0[0]))
-        times, f0s, cents = zip(*[(time, f0, 1200 * math.log(f0 / librosa.note_to_hz("A1"), 2)) for time, f0 in zip(times, f0s) if f0 != 0])
-        plt.plot(times, cents, next(color_cycle), label=f"Voice {voice}")
+    for idx in range(len(freqs_per_voice)):
+        voice_freqs = freqs_per_voice[idx]
+        valid_idxs = voice_freqs > 0
+        voice_freqs = voice_freqs[valid_idxs]
+        cents = 1200 * np.log2(voice_freqs / librosa.note_to_hz("A1"))
+        plt.plot(times[valid_idxs], cents, next(color_cycle), label=f"Voice {idx}")
     plt.legend()
     plt.savefig(os.path.join(output_path, f"{name}.jpg"))
     plt.close()
@@ -166,23 +200,23 @@ def plot_predictions(
 
 def save_reconstructed_audio(
     est_times: FloatArray,
-    est_freqs: list[FloatArray],
+    est_freqs: FloatArray,
     name: str,
     output_path: Path,
     settings: Settings,
 ) -> None:
     check_output_path(output_path)
-    voice_times_and_f0s = get_voice_times_and_f0s_from_times_and_freqs(est_times, est_freqs)
-    number_of_voices = len(voice_times_and_f0s)
+    freqs_per_voice = est_freqs.transpose()
+    number_of_voices = len(freqs_per_voice)
     voice_audios: list[FloatArray] = []
-    for voice, times_and_f0s in voice_times_and_f0s.items():
-        times, f0s = zip(*sorted(list(times_and_f0s.items()), key=lambda time_and_f0: time_and_f0[0]))
+    for idx in range(number_of_voices):
+        voice_freqs = freqs_per_voice[idx]
         voice_audio = sonify_trajectory_with_sinusoid(
-            np.array(list(zip(times, f0s))),
+            np.array(list(zip(est_times, voice_freqs))),
             sr=settings.sr,
             amplitude=1 / number_of_voices,
         )
-        voice_path = os.path.join(output_path, f"{name}_reconstruction_voice{voice}.wav")
+        voice_path = os.path.join(output_path, f"{name}_reconstruction_voice{idx}.wav")
         scipy.io.wavfile.write(voice_path, settings.sr, voice_audio)
         voice_audios.append(voice_audio)
     joint_path = os.path.join(output_path, f"{name}_reconstruction_allvoices.wav")
@@ -197,16 +231,12 @@ def convert_times_and_freqs_arrays_to_lists(
     return est_times.tolist(), [arr.tolist() for arr in est_freqs]
 
 
-def sum_wav_files(input_files: list[Path], output_path: Path, settings: Settings) -> None:
-    input_arrays: list[FloatArray] = []
-    for file in input_files:
-        arr, _ = librosa.load(file.absolute().as_posix(), sr=settings.sr)
-        input_arrays.append(arr)
+def sum_wave_arrays(input_arrays: list[FloatArray]) -> FloatArray:
+    input_arrays = [np.copy(input_array) for input_array in input_arrays]
     max_length = max(arr.shape[0] for arr in input_arrays)
     for idx, arr in enumerate(input_arrays):
         if arr.shape[0] < max_length:
             new_arr = np.zeros((max_length,)).astype(np.float32)
             new_arr[: arr.shape[0]] = arr
             input_arrays[idx] = new_arr
-    array_sum = np.sum(input_arrays, 0)
-    scipy.io.wavfile.write(output_path, settings.sr, array_sum)
+    return cast(FloatArray, np.sum(input_arrays, 0))

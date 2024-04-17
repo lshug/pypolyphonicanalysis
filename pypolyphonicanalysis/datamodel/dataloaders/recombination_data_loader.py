@@ -25,20 +25,27 @@ class RecombinationDataLoader(BaseDataLoader):
         self._tracks_per_multitrack_ub = tracks_per_multitrack_ub
         self._pitch_shift_lb = pitch_shift_lb
         self._pitch_shift_ub = pitch_shift_ub
-        self._allow_repeats = with_replacement
+        self._with_replacement = with_replacement
         self._maxlen = maxlen
-        self._dataloader_iters = [iter(dataloader.get_multitracks()) for dataloader in dataloaders]
 
     def _get_multitracks(self) -> Iterable[Multitrack]:
-        loaded_tracks: list[Track] = [track for dataloader_iter in self._dataloader_iters for track in next(dataloader_iter)]
-        number_of_tracks = self._random.randint(self._tracks_per_multitrack_lb, self._tracks_per_multitrack_ub)
-        number_of_tracks = max(len(loaded_tracks), number_of_tracks)
-        tracks: list[Track] = self._random.choices(loaded_tracks, k=number_of_tracks) if self._allow_repeats else self._random.sample(loaded_tracks, k=number_of_tracks)
-        for idx, track in enumerate(tracks):
-            pitch_shift = self._random.randint(self._pitch_shift_lb, self._pitch_shift_ub)
-            if pitch_shift != 0:
-                tracks[idx] = next(iter(track.pitch_shift(pitch_shift, pitch_shift)))
-        yield Multitrack(tracks)
+        dataloader_iters = [iter(dataloader.get_multitracks()) for dataloader in self._dataloaders]
+        for _ in range(len(self)):
+            loaded_tracks: list[Track] = []
+            for idx, loader in enumerate(self._dataloaders):
+                try:
+                    loaded_tracks.extend([track for track in next(dataloader_iters[idx])])
+                except StopIteration:
+                    dataloader_iters[idx] = iter(loader.get_multitracks())
+                    loaded_tracks.extend([track for track in next(dataloader_iters[idx])])
+            number_of_tracks = self._random.randint(self._tracks_per_multitrack_lb, self._tracks_per_multitrack_ub)
+            number_of_tracks = max(len(loaded_tracks), number_of_tracks)
+            tracks: list[Track] = self._random.choices(loaded_tracks, k=number_of_tracks) if self._with_replacement else self._random.sample(loaded_tracks, k=number_of_tracks)
+            for idx, track in enumerate(tracks):
+                pitch_shift = self._random.randint(self._pitch_shift_lb, self._pitch_shift_ub)
+                if pitch_shift != 0:
+                    tracks[idx] = track.pitch_shift(pitch_shift)
+            yield Multitrack(tracks)
 
     def _get_length(self) -> int:
         return min([len(dataloader) for dataloader in self._dataloaders])

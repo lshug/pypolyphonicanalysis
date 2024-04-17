@@ -8,12 +8,12 @@ from pypolyphonicanalysis.analysis.analysis_runner import (
     AutomaticAnalysisRunner,
 )
 from pypolyphonicanalysis.models.baseline_model import BaselineModel
-from pypolyphonicanalysis.processing.frequency_range_filter import FrequencyRangeFilter
-from pypolyphonicanalysis.processing.masking_filter import MaskingFilter
+from pypolyphonicanalysis.processing.f0.frequency_range_filter import FrequencyRangeFilter
+from pypolyphonicanalysis.processing.f0.masking_filter import MaskingFilter
 from pypolyphonicanalysis.settings import Settings
 
 settings = Settings()
-model = BaselineModel("model.pth", settings, inference_mode=True)
+model = BaselineModel("model.pth", settings)
 
 processors = [
     FrequencyRangeFilter(float(librosa.note_to_hz("G2")), float(librosa.note_to_hz("G7"))),
@@ -50,7 +50,8 @@ for file in os.listdir(os.path.join(settings.data_directory_path, "corpora", "GV
             )
         )
 
-analyzer = AutomaticAnalysisRunner(Path("output/svaneti_out/"), model, processors, settings, Path("activation_cache/"))
+
+analyzer = AutomaticAnalysisRunner(Path("output/svaneti_out/"), model, processors, settings, Path("activation_cache"))
 svaneti_results = analyzer.generate_analysis_results(svaneti_recordings)
 
 analyzer.set_output_path(Path("output/kakheti_out/"))

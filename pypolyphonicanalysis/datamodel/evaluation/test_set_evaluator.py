@@ -6,7 +6,6 @@ import mir_eval
 import pandas as pd
 from tqdm import tqdm
 
-from pypolyphonicanalysis.datamodel.features.feature_store import FeatureStore
 from pypolyphonicanalysis.datamodel.features.features import Features
 from pypolyphonicanalysis.datamodel.tracks.sum_track import load_sum_track
 from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import (
@@ -20,6 +19,7 @@ from pypolyphonicanalysis.utils.utils import (
     save_reconstructed_audio,
     plot_predictions,
 )
+from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
 pd.set_option("display.max_rows", 200)
 pd.set_option("display.max_columns", 200)
@@ -36,7 +36,7 @@ def get_evaluations_path(settings: Settings) -> Path:
 class TestSetEvaluator:
     def __init__(self, settings: Settings, max_count: int = -1) -> None:
         self._settings = settings
-        self._feature_store = FeatureStore(self._settings)
+        self._feature_store = get_feature_store(self._settings)
         training_metadata_path = Path(settings.data_directory_path).joinpath("training_metadata")
         train_test_validation_split = json.load(open(training_metadata_path.joinpath("train_test_validation_split.json"), "r"))
         self._test_sum_tracks = [load_sum_track(sum_track_name, self._settings) for sum_track_name in train_test_validation_split["test"]]
@@ -50,15 +50,13 @@ class TestSetEvaluator:
         for idx, sum_track in enumerate(tqdm(self._test_sum_tracks)):
             with nullcontext():  # tf.profiler.experimental.Trace("eval", step_num=idx, _r=1):
                 ground_truth_salience_map = self._feature_store.generate_or_load_feature_for_sum_track(sum_track, Features.SALIENCE_MAP)
-                predicted_salience_map = model.predict_on_file(sum_track.audio_source_path)
+                predicted_salience_map = model.predict_on_sum_track(sum_track)
                 gt_times, gt_freqs = get_estimated_times_and_frequencies_from_salience_map(
                     ground_truth_salience_map,
-                    self._settings.threshold,
                     settings=self._settings,
                 )
                 pred_times, pred_freqs = get_estimated_times_and_frequencies_from_salience_map(
                     predicted_salience_map,
-                    self._settings.threshold,
                     settings=self._settings,
                 )
                 save_reconstructed_audio(gt_times, gt_freqs, f"ground_truth_{sum_track.name}", evaluation_path, settings=self._settings)

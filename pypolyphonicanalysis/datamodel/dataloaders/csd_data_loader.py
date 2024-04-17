@@ -6,12 +6,12 @@ from pypolyphonicanalysis.datamodel.tracks.track import Track
 
 
 class CSDDataloader(BaseDataLoader):
-    csd_corpus_directory_name: str = "ChoralSingingDataset"
-    csd_song_prefixes = ["CSD_ER_", "CSD_LI_", "CSD_ND_"]
+    corpus_directory_name: str = "ChoralSingingDataset"
+    song_prefixes = ["CSD_ER_", "CSD_LI_", "CSD_ND_"]
 
     def _get_multitracks(self) -> Iterable[Multitrack]:
-        corpus_path = self.get_corpus_path(self.csd_corpus_directory_name)
-        for song_prefix in self._shuffle_if_enabled(self.csd_song_prefixes):
+        corpus_path = self.get_corpus_path(self.corpus_directory_name)
+        for song_prefix in self._shuffle_if_enabled(self.song_prefixes):
             track_string_template = f"{song_prefix}{{}}_{{}}"
             wav_template = f"{track_string_template}.wav"
             f0_template = f"{track_string_template}.f0"
@@ -21,9 +21,9 @@ class CSDDataloader(BaseDataLoader):
                     [
                         Track(
                             name=track_string_template.format(voice, idx),
-                            audio_source_path=corpus_path.joinpath(wav_template.format(voice, idx)),
+                            audio_source=corpus_path.joinpath(wav_template.format(voice, idx)),
                             settings=self._settings,
-                            f0_source_path=corpus_path.joinpath(f0_template.format(voice, idx)),
+                            f0_source=corpus_path.joinpath(f0_template.format(voice, idx)),
                         )
                         for idx in self._shuffle_if_enabled(range(1, 5))
                     ]

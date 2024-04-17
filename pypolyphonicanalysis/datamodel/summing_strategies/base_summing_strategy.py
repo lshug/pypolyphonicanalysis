@@ -1,6 +1,5 @@
 import abc
 from abc import abstractmethod
-from pathlib import Path
 
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
 from pypolyphonicanalysis.datamodel.tracks.sum_track import (
@@ -10,6 +9,7 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track import (
 )
 from pypolyphonicanalysis.datamodel.tracks.track import track_is_saved
 from pypolyphonicanalysis.settings import Settings
+from pypolyphonicanalysis.utils.utils import FloatArray
 
 
 class BaseSummingStrategy(abc.ABC):
@@ -21,8 +21,11 @@ class BaseSummingStrategy(abc.ABC):
         """Gets the name of the summed file to be generated."""
 
     @abstractmethod
-    def _get_sum(self, multitrack: Multitrack) -> tuple[Path, Multitrack]:
+    def _get_sum(self, multitrack: Multitrack) -> tuple[FloatArray, Multitrack]:
         """Sums the multitrack and returns a tuple of the path to the summed audio file and processed multitrack"""
+
+    def _trim_sum_track_to_minimum_duration(self, sum_track: SumTrack) -> SumTrack:
+        return sum_track
 
     def sum_or_retrieve(self, multitrack: Multitrack) -> SumTrack:
         """Sums the multitrack and returns a tuple of the summed track and processed multitrack"""
@@ -31,11 +34,10 @@ class BaseSummingStrategy(abc.ABC):
             return load_sum_track(sum_name, self._settings)
         else:
             for track in multitrack:
-                if not track_is_saved(track.name, self._settings):
+                if not track_is_saved(track.name, self._settings) and self._settings.save_raw_training_data:
                     track.save()
-            audio_source_path, multitrack = self._get_sum(multitrack)
-            sum_track = SumTrack(sum_name, audio_source_path, multitrack, self._settings)
-            sum_track.save()
+            sum_audio_array, multitrack = self._get_sum(multitrack)
+            sum_track = SumTrack(sum_name, sum_audio_array, multitrack, self._settings)
             return sum_track
 
     @abstractmethod

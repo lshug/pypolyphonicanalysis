@@ -1,5 +1,6 @@
 import hashlib
 import os
+from functools import cache
 from pathlib import Path
 
 import numpy as np
@@ -26,7 +27,7 @@ def feature_is_generated_for_sum_track(sum_track: SumTrack, feature: Features, s
 
 
 def feature_is_generated_for_file(file: Path, feature: Features, settings: Settings) -> bool:
-    if not settings.cache_prediction_file_features:
+    if not settings.save_prediction_file_features:
         return False
     file_feature_store_path = get_features_path(settings).joinpath(f"file_{hashlib.file_digest(open(file, 'rb'), 'md5').hexdigest()}")
     return file_feature_store_path.joinpath(f"{feature.name}.npy").is_file() and file_feature_store_path.joinpath(f"{feature.name}.saved").is_file()
@@ -91,7 +92,7 @@ class FeatureStore:
         generator, index = self._feature_generator_and_index_dict[input_feature]
         assert isinstance(generator, InputFeatureGenerator)
         generated_features = generator.generate_features_for_file(file)
-        if self._settings.cache_prediction_file_features:
+        if self._settings.save_prediction_file_features:
             for feature, (
                 feature_generator,
                 feature_index,
@@ -107,7 +108,7 @@ class FeatureStore:
             feature_generator,
             feature_index,
         ) in self._feature_generator_and_index_dict.items():
-            if feature_generator is generator:
+            if feature_generator is generator and self._settings.save_training_features:
                 self._save_array_for_sum_track(generated_features[feature_index], sum_track, feature)
         return generated_features[index]
 
@@ -128,3 +129,8 @@ class FeatureStore:
         np.save(file_features_path.joinpath(f"{feature.name}.npy"), array)
         with open(file_features_path.joinpath(f"{feature.name}.saved"), "a"):
             os.utime(file_features_path.joinpath(f"{feature.name}.saved"), None)
+
+
+@cache
+def get_feature_store(settings: Settings) -> FeatureStore:
+    return FeatureStore(settings)

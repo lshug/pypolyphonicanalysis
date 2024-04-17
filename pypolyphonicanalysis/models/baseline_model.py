@@ -11,7 +11,6 @@ class BaselineNNModule(nn.Module):
     def __init__(self, settings: Settings) -> None:
         super().__init__()
         self._channels = len(settings.harmonics)
-        self._input_number_of_slices = settings.input_number_of_slices
         self._bins = settings.bins_per_octave * settings.n_octaves
         self._mag_base_model = nn.Sequential(*self._layer_sequence([self._channels, 16, 32, 32, 32, 32, 32], [5, 5, 5, 5, (70, 3), (70, 3)], True))
         self._phase_diff_base_model = nn.Sequential(*self._layer_sequence([self._channels, 16, 32, 32, 32, 32, 32], [5, 5, 5, 5, (70, 3), (70, 3)], True))
@@ -39,8 +38,8 @@ class BaselineNNModule(nn.Module):
 
 
 class BaselineModel(BaseMultipleF0EstimationModel):
-    def __init__(self, model: str | None, settings: Settings, inference_mode: bool = False) -> None:
-        super().__init__(settings, inference_mode)
+    def __init__(self, model: str | None, settings: Settings) -> None:
+        super().__init__(settings)
         self._model = BaselineNNModule(settings)
         if model is not None:
             self._model.load_state_dict(torch.load(get_models_path(self._settings).joinpath(model).absolute().as_posix()))

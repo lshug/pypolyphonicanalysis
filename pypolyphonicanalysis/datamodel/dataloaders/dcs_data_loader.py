@@ -39,12 +39,12 @@ class DCSDataLoader(BaseDataLoader):
                 ]:
                     track_name = file_string_template.format(song, take, voice)
                     wav_filename = f"{track_name}.wav"
-                    f0_filename = f"{track_name}.f0"
+                    f0_filename = f"{track_name}.csv"
                     voice_track = Track(
                         name=track_name,
-                        audio_source_path=corpus_path.joinpath("audio_wav_22050_mono").joinpath(wav_filename),
+                        audio_source=corpus_path.joinpath("audio_wav_22050_mono").joinpath(wav_filename),
                         settings=self._settings,
-                        f0_source_path=corpus_path.joinpath("annotations_csv_F0_PYIN").joinpath(f0_filename),
+                        f0_source=corpus_path.joinpath("annotations_csv_F0_PYIN").joinpath(f0_filename),
                     )
                     tracks.append(voice_track)
                 yield Multitrack((tracks[0], tracks[1], tracks[2], tracks[3]))
