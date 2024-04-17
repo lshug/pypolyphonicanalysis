@@ -6,7 +6,6 @@ import musdb
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
 from pypolyphonicanalysis.datamodel.tracks.track import Track
-from pypolyphonicanalysis.settings import Settings
 
 
 class MUSDBDataLoader(BaseDataLoader):
@@ -27,12 +26,3 @@ class MUSDBDataLoader(BaseDataLoader):
 
     def _get_length(self) -> int:
         return 150
-
-
-"""
-settings = Settings()
-for t in MUSDBDataLoader(True,  settings, 100).get_multitracks():
-    print(t[0].audio_source_path)
-"""
-settings = Settings()
-db = musdb.DB(root=MUSDBDataLoader(True, settings, 100).get_corpus_path("MUSDB").joinpath("WAV"), is_wav=True)

@@ -77,6 +77,10 @@ class Track:
         return self._name
 
     @property
+    def settings(self) -> Settings:
+        return self._settings
+
+    @property
     def audio_array(self) -> FloatArray:
         if self._audio_array is None:
             match self._audio_source:
@@ -109,6 +113,8 @@ class Track:
         return self._f0_trajectory_annotation
 
     def save(self) -> None:
+        if track_is_saved(self.name, self._settings):
+            return
         tracks_path = get_tracks_path(self._settings)
         track_path = tracks_path.joinpath(self.name)
         track_path.mkdir(parents=True, exist_ok=True)
@@ -176,6 +182,10 @@ class Track:
         return times, f0
 
     def trim_to_frames(self, n_frames: int) -> "Track":
+        if n_frames == self._n_frames:
+            return self
+        if track_is_saved(f"{self.name}_trim_{n_frames}", self._settings):
+            return load_track(f"{self.name}_trim_{n_frames}", self._settings)
         n_samples = n_frames * self._settings.hop_length
         return Track(
             f"{self.name}_trim_{n_frames}", self.audio_array[:n_samples], self._settings, (self.f0_trajectory_annotation[0][:n_frames], self.f0_trajectory_annotation[1][:n_frames])

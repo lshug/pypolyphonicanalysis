@@ -1,5 +1,6 @@
 import hashlib
 import os
+from functools import cache
 from pathlib import Path
 
 import numpy as np
@@ -128,3 +129,8 @@ class FeatureStore:
         np.save(file_features_path.joinpath(f"{feature.name}.npy"), array)
         with open(file_features_path.joinpath(f"{feature.name}.saved"), "a"):
             os.utime(file_features_path.joinpath(f"{feature.name}.saved"), None)
+
+
+@cache
+def get_feature_store(settings: Settings) -> FeatureStore:
+    return FeatureStore(settings)

@@ -1,5 +1,5 @@
 from collections import Counter
-from typing import Iterable, Iterator
+from typing import Iterator
 
 from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider, SumTrackSplitType
 from pypolyphonicanalysis.datamodel.features.feature_stream import FeatureStream
@@ -8,7 +8,7 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray, get_random_number_generator
 
-FeatureStreamIterableType = Iterable[tuple[list[FloatArray], list[FloatArray]]]
+FeatureStreamIteratorType = Iterator[tuple[list[FloatArray], list[FloatArray]]]
 
 
 class SumTrackFeatureStreamMux:
@@ -27,7 +27,7 @@ class SumTrackFeatureStreamMux:
         active_stream_counts: Counter[FeatureStream],
         queues: dict[SumTrackSplitType, list[tuple[list[FloatArray], list[FloatArray]]]],
         split_type: SumTrackSplitType,
-    ) -> FeatureStreamIterableType:
+    ) -> FeatureStreamIteratorType:
         while len(active_streams) != 0:
             if len(active_streams) < self._number_of_streams:
                 try:
@@ -37,14 +37,15 @@ class SumTrackFeatureStreamMux:
                     pass
             if len(queues[split_type]) != 0:
                 yield queues[split_type].pop(-1)
-            active_stream, split_type = self._rng.choice(active_streams)
-            queues[split_type].append(next(active_stream))
-            active_stream_counts[active_stream] += 1
-            if active_stream_counts[active_stream] >= self._settings.training_mux_number_of_samples_per_sum_track:
-                del active_stream_counts[active_stream]
-                active_streams.remove((active_stream, split_type))
+            if len(active_streams) > 0:
+                active_stream, split_type = self._rng.choice(active_streams)
+                queues[split_type].append(next(active_stream))
+                active_stream_counts[active_stream] += 1
+                if active_stream_counts[active_stream] >= self._settings.training_mux_number_of_samples_per_sum_track:
+                    del active_stream_counts[active_stream]
+                    active_streams.remove((active_stream, split_type))
 
-    def get_features(self) -> tuple[FeatureStreamIterableType, FeatureStreamIterableType, FeatureStreamIterableType]:
+    def get_feature_iterators(self) -> tuple[FeatureStreamIteratorType, FeatureStreamIteratorType, FeatureStreamIteratorType]:
         sum_track_iterator = iter(self._sum_track_provider.get_sum_tracks())
         queues: dict[SumTrackSplitType, list[tuple[list[FloatArray], list[FloatArray]]]] = {
             SumTrackSplitType.TRAIN: [],
@@ -62,4 +63,4 @@ class SumTrackFeatureStreamMux:
         train_iterable = self._get_multiplexed_feature_iterator_for_split_type(active_streams, sum_track_iterator, active_stream_counter, queues, SumTrackSplitType.TRAIN)
         test_iterable = self._get_multiplexed_feature_iterator_for_split_type(active_streams, sum_track_iterator, active_stream_counter, queues, SumTrackSplitType.TEST)
         valid_iterable = self._get_multiplexed_feature_iterator_for_split_type(active_streams, sum_track_iterator, active_stream_counter, queues, SumTrackSplitType.VALIDATION)
-        return train_iterable, test_iterable, valid_iterable
+        return iter(train_iterable), iter(test_iterable), iter(valid_iterable)

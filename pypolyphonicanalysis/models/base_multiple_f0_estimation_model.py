@@ -5,13 +5,11 @@ import numpy as np
 import torch
 from torch import nn
 
-from pypolyphonicanalysis.datamodel.features.feature_store import (
-    FeatureStore,
-)
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
+from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
 
 def get_models_path(settings: Settings) -> Path:
@@ -23,7 +21,7 @@ def get_models_path(settings: Settings) -> Path:
 class BaseMultipleF0EstimationModel:
     def __init__(self, settings: Settings) -> None:
         self._settings = settings
-        self._feature_store = FeatureStore(self._settings)
+        self._feature_store = get_feature_store(self._settings)
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     @property

@@ -1,10 +1,10 @@
 import numpy as np
 
-from pypolyphonicanalysis.datamodel.features.feature_store import FeatureStore
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray, get_random_state
+from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
 
 class FeatureStream:
@@ -15,7 +15,7 @@ class FeatureStream:
         self._label_features = label_features
         self._batch_size = settings.training_batch_size
         self._number_of_slices = settings.training_input_number_of_slices
-        self._feature_store = FeatureStore(settings)
+        self._feature_store = get_feature_store(settings)
         self._rng = get_random_state(settings)
 
     def __iter__(self) -> "FeatureStream":

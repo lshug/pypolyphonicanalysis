@@ -8,7 +8,11 @@ from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay
 class Multitrack:
     def __init__(self, tracks: Iterable[Track]) -> None:
         self._tracks = tuple(tracks)
-        self._trim_tracks()
+        if len(self._tracks) > 0:
+            self._trim_tracks()
+            for track in self._tracks:
+                if track.settings.save_raw_training_data:
+                    track.save()
 
     def _trim_tracks(self) -> None:
         min_frames = min(track.n_frames for track in self._tracks)

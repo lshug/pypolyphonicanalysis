@@ -24,7 +24,7 @@ def sum_track_is_saved(track_name: str, settings: Settings) -> bool:
     return sum_track_path.is_dir() and sum_track_path.joinpath(".saved").is_file()
 
 
-def load_sum_track(sum_track_name: str, settings: Settings, shallow: bool = True) -> "SumTrack":
+def load_sum_track(sum_track_name: str, settings: Settings, shallow: bool = False) -> "SumTrack":
     if shallow:
         return SumTrack(sum_track_name, Path(), Multitrack([]), settings)
     sum_tracks_path = get_sum_tracks_path(settings)
@@ -71,7 +71,10 @@ class SumTrack:
         if self._audio_array is None:
             match self._audio_source:
                 case Path():
-                    self._audio_array = librosa.load(self._audio_source.absolute().as_posix(), sr=self._settings.sr, mono=True)[0]
+                    try:
+                        self._audio_array = librosa.load(self._audio_source.absolute().as_posix(), sr=self._settings.sr, mono=True)[0]
+                    except:
+                        raise
                 case _:
                     source_arr = self._audio_source
                     assert isinstance(source_arr, np.ndarray)

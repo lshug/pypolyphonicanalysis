@@ -1,6 +1,8 @@
 from pydantic import Field, PositiveFloat, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from pypolyphonicanalysis.datamodel.features.features import Features
+
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="pypolyphonicanalysis_", frozen=True)
@@ -12,6 +14,9 @@ class Settings(BaseSettings):
     save_raw_training_data: bool = True
     save_training_features: bool = True
     save_prediction_file_features: bool = True
+    sum_track_provider_number_of_dataloader_partition_jobs: PositiveInt = 10
+    sum_track_provider_number_of_multitrack_processing_jobs_per_dataloader_partition: PositiveInt = 10
+    sum_track_provider_features_to_generate_early: frozenset[Features] = Field(default=frozenset({Features.HCQT_MAG, Features.HCQT_PHASE_DIFF, Features.HCQT_PHASE_DIFF}))
 
     inference_batch_size: PositiveInt = 4
     inference_input_number_of_slices: PositiveInt = 5000
