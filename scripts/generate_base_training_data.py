@@ -26,7 +26,20 @@ feature_store = get_feature_store(settings)
 summing_strategies: list[BaseSummingStrategy] = [
     DirectSum(settings),
     ReverbSum(settings),
-    RoomSimulationSum(settings, (10, 7.5, 3.5), (2.5, 3.73, 1.76), [(4, 4.6, 1.6), (4.5, 4.8, 1.8), (5, 4.85, 1.7), (5.5, 4.8, 1.6), (6, 4.6, 1.9)], rt60=1.0, max_rand_disp=0.5),
+    RoomSimulationSum(
+        settings,
+        room_dim_range=((10, 10), (7.5, 8.5), (3.5, 4.5)),
+        mic_position_range=((0.2, 0.3), (0.48, 0.52), (0.48, 0.52)),
+        source_position_ranges=[
+            ((0.39, 0.41), (0.59, 0.61), (0.34, 0.36)),
+            ((0.44, 0.64), (0.61, 0.63), (0.39, 0.41)),
+            ((0.49, 0.51), (0.62, 0.64), (0.35, 0.38)),
+            ((0.54, 0.56), (0.61, 0.63), (0.34, 0.36)),
+            ((0.59, 0.61), (0.59, 0.61), (0.39, 0.41)),
+        ],
+        rt60_range=(0.3, 0.8),
+        max_rand_disp_range=(0.03, 0.06),
+    ),
 ]
 dataset_loaders: list[BaseDataLoader] = [
     CSDDataloader(shuffle, settings),
