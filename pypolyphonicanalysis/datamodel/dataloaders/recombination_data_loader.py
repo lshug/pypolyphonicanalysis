@@ -12,6 +12,7 @@ class RecombinationDataLoader(BaseDataLoader):
         self,
         dataloaders: list[BaseDataLoader],
         settings: Settings,
+        max_track_yields_per_dataloader_per_multitrack: int = 10,
         tracks_per_multitrack_lb: int = 2,
         tracks_per_multitrack_ub: int = 5,
         pitch_shift_lb: int = 0,
@@ -21,6 +22,7 @@ class RecombinationDataLoader(BaseDataLoader):
     ) -> None:
         super().__init__(True, settings, maxlen)
         self._dataloaders = dataloaders
+        self._max_track_yields_per_dataloader_per_multitrack = max_track_yields_per_dataloader_per_multitrack
         self._tracks_per_multitrack_lb = tracks_per_multitrack_lb
         self._tracks_per_multitrack_ub = tracks_per_multitrack_ub
         self._pitch_shift_lb = pitch_shift_lb
@@ -33,11 +35,12 @@ class RecombinationDataLoader(BaseDataLoader):
         for _ in range(len(self)):
             loaded_tracks: list[Track] = []
             for idx, loader in enumerate(self._dataloaders):
-                try:
-                    loaded_tracks.extend([track for track in next(dataloader_iters[idx])])
-                except StopIteration:
-                    dataloader_iters[idx] = iter(loader.get_multitracks())
-                    loaded_tracks.extend([track for track in next(dataloader_iters[idx])])
+                for _ in range(self._max_track_yields_per_dataloader_per_multitrack):
+                    try:
+                        loaded_tracks.extend([track for track in next(dataloader_iters[idx])])
+                    except StopIteration:
+                        dataloader_iters[idx] = iter(loader.get_multitracks())
+                        loaded_tracks.extend([track for track in next(dataloader_iters[idx])])
             number_of_tracks = self._random.randint(self._tracks_per_multitrack_lb, self._tracks_per_multitrack_ub)
             number_of_tracks = max(len(loaded_tracks), number_of_tracks)
             tracks: list[Track] = self._random.choices(loaded_tracks, k=number_of_tracks) if self._with_replacement else self._random.sample(loaded_tracks, k=number_of_tracks)

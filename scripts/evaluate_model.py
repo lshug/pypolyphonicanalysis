@@ -8,7 +8,7 @@ from pypolyphonicanalysis.utils.utils import get_train_test_validation_split
 
 settings = Settings()
 
-model = BaselineModel("model.pth", settings)
+model = BaselineModel(settings, "model")
 sum_track_provider = SumTrackProvider(settings, train_test_validation_split=get_train_test_validation_split("train_test_validation_split", settings))
 evaluator = TestSetEvaluator(sum_track_provider, settings=settings, max_count=40)
 evaluation = evaluator.evaluate_model(model)

@@ -5,7 +5,7 @@ from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
 from pypolyphonicanalysis.datamodel.tracks.track import Track
 
 
-class Cantoria(BaseDataLoader):
+class CantoriaDataLoader(BaseDataLoader):
     csd_corpus_directory_name: str = "CantoriaDataset_v1.0.0"
     csd_song_prefixes = song_prefixes = ["SSS", "RRC", "EJB1", "EJB2", "VBP", "HCB", "LNG", "THM", "CEA", "YSM", "LJT1", "LJT2", "LBM1", "LBM2"]
 

@@ -47,7 +47,7 @@ class TestSetEvaluator:
         all_scores: list[dict[str, float]] = []
         for idx, sum_track in enumerate(tqdm(self._test_sum_tracks)):
             ground_truth_salience_map = self._feature_store.generate_or_load_feature_for_sum_track(sum_track, Features.SALIENCE_MAP)
-            predicted_salience_map = model.predict_on_sum_track(sum_track)
+            predicted_salience_map = model.predict_on_sum_track(sum_track)[Features.SALIENCE_MAP]
             gt_times, gt_freqs = get_estimated_times_and_frequencies_from_salience_map(
                 ground_truth_salience_map,
                 settings=self._settings,

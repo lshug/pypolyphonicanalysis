@@ -33,7 +33,7 @@ def get_train_test_validation_split(split_name: str, settings: Settings) -> Trai
     return split
 
 
-def get_save_test_validation_split(split_name: str, split: TrainTestValidationSplit, settings: Settings) -> None:
+def save_train_test_validation_split(split_name: str, split: TrainTestValidationSplit, settings: Settings) -> None:
     json.dump(split, open(Path(settings.data_directory_path).joinpath("training_metadata").joinpath(f"{split_name}.json"), "w"), indent=4)
 
 
@@ -109,7 +109,7 @@ def get_estimated_times_and_frequencies_from_salience_map(
     peaks = scipy.signal.argrelmax(pitch_activation_mat, axis=0)
     peak_thresh_mat[peaks] = pitch_activation_mat[peaks]
 
-    idx = np.where(peak_thresh_mat >= settings.threshold)
+    idx = np.where(peak_thresh_mat >= settings.activation_threshold)
     est_freqs: list[list[float]] = [[] for _ in range(len(time_grid))]
     for f, t in zip(idx[0], idx[1]):
         est_freqs[t].append(freq_grid[f])
