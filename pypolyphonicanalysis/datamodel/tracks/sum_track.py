@@ -55,8 +55,6 @@ class SumTrack:
         self._audio_source = audio_source
         self._audio_array: FloatArray | None = None
         self._n_frames: int | None = None
-        if self._settings.save_raw_training_data:
-            self.save()
 
     @property
     def name(self) -> str:

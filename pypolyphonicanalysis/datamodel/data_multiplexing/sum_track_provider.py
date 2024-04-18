@@ -80,6 +80,8 @@ def process_multitrack_with_summing_strategies(
             if sum_track_processors is not None:
                 for processor in sum_track_processors:
                     sum_track = processor.process(sum_track)
+            if settings.save_raw_training_data:
+                sum_track.save()
             for feature in settings.sum_track_provider_features_to_generate_early:
                 feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
             sum_tracks_with_splits.append((sum_track, generate_random_split(settings)))

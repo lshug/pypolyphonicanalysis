@@ -265,7 +265,7 @@ class AutomaticAnalysisRunner:
             check_is_fitted(gmm)
         except NotFittedError:
             gmm = None
-        if self._settings.save_raw_training_data:
+        if self._settings.save_ground_truth_track_data:
             for track in unsaved_tracks:
                 track.save()
         return gmm

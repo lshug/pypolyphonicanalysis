@@ -2,8 +2,8 @@ import torch
 from torch import nn
 
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature, Features
+from pypolyphonicanalysis.models.base_feature_to_salience_map_nn_module import BaseFeatureToSalienceMapNNModule
 from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import BaseMultipleF0EstimationModel
-from pypolyphonicanalysis.settings import Settings
 
 
 class ResidualCNNBlockModule(nn.Module):
@@ -28,30 +28,18 @@ class ResidualCNNBlockModule(nn.Module):
         return out
 
 
-class ResidualNNModule(nn.Module):
+class ResidualNNModule(BaseFeatureToSalienceMapNNModule):
+    def _get_feature_representation_module(self) -> nn.Module:
+        return nn.Sequential(nn.BatchNorm2d(self._channels), ResidualCNNBlockModule(self._channels, 32, [5, 5, 5, (70, 3), (70, 3)]))
 
-    def __init__(self, settings: Settings) -> None:
-        super().__init__()
-        self._channels = len(settings.harmonics)
-        self._bins = settings.bins_per_octave * settings.n_octaves
-
-        self._mag_base_model = nn.Sequential(nn.BatchNorm2d(self._channels), ResidualCNNBlockModule(self._channels, 32, [5, 5, 5, (70, 3), (70, 3)]))
-        self._phase_diff_base_model = nn.Sequential(nn.BatchNorm2d(self._channels), *[ResidualCNNBlockModule(self._channels, 32, [5, 5, 5, (70, 3), (70, 3)])])
-        self._model_head = nn.Sequential(
-            ResidualCNNBlockModule(64, 64, [3, 3]), nn.Conv2d(64, 8, (self._bins, 1), padding="same"), nn.BatchNorm2d(8), nn.Conv2d(8, 1, 1, padding="same")
-        )
-
-    def forward(self, mag: torch.Tensor, phase_diff: torch.Tensor) -> torch.Tensor:
-        concat_repr = torch.concat([self._mag_base_model(mag), self._phase_diff_base_model(phase_diff)], 1)
-        output_repr: torch.Tensor = self._model_head(concat_repr)
-        output_repr = torch.sigmoid(output_repr)
-        return output_repr.squeeze(1)
+    def _get_joint_representation_module(self) -> nn.Module:
+        return nn.Sequential(ResidualCNNBlockModule(64, 64, [3, 3]), nn.Conv2d(64, 8, (self._bins, 1), padding="same"), nn.BatchNorm2d(8), nn.Conv2d(8, 1, 1, padding="same"))
 
 
 class ResidualModel(BaseMultipleF0EstimationModel):
 
     def _create_model(self) -> nn.Module:
-        return ResidualNNModule(self._settings)
+        return ResidualNNModule(self.model_input_features, self._settings)
 
     @property
     def model_input_features(self) -> list[InputFeature]:

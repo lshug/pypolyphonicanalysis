@@ -40,7 +40,6 @@ class Settings(BaseSettings):
     fmin: PositiveFloat = Field(default=32.7)
     hop_length: PositiveInt = Field(default=256)
     blur_salience_map: bool = Field(default=True)
-    epsilon: float = 1e-10
 
     # Analysis
     activation_threshold: PositiveFloat = Field(default=0.5, le=1.0)
@@ -50,3 +49,4 @@ class Settings(BaseSettings):
     peak_finding_minimum_cent_distance: PositiveFloat = 50
     squeeze_harmonic_intervals_into_one_octave: bool = True
     clustering_distance_threshold: PositiveFloat = 30
+    save_ground_truth_track_data: bool = True

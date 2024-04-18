@@ -7,7 +7,6 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track import (
     load_sum_track,
     sum_track_is_saved,
 )
-from pypolyphonicanalysis.datamodel.tracks.track import track_is_saved
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
 
@@ -33,9 +32,6 @@ class BaseSummingStrategy(abc.ABC):
         if sum_track_is_saved(sum_name, self._settings):
             return load_sum_track(sum_name, self._settings)
         else:
-            for track in multitrack:
-                if not track_is_saved(track.name, self._settings) and self._settings.save_raw_training_data:
-                    track.save()
             sum_audio_array, multitrack = self._get_sum(multitrack)
             sum_track = SumTrack(sum_name, sum_audio_array, multitrack, self._settings)
             return sum_track
