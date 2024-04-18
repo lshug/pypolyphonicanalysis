@@ -13,7 +13,7 @@ from pypolyphonicanalysis.processing.f0.masking_filter import MaskingFilter
 from pypolyphonicanalysis.settings import Settings
 
 settings = Settings()
-model = BaselineModel("model.pth", settings)
+model = BaselineModel(settings, "model")
 
 processors = [
     FrequencyRangeFilter(float(librosa.note_to_hz("G2")), float(librosa.note_to_hz("G7"))),

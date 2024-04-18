@@ -23,6 +23,7 @@ from sklearn.neighbors import KernelDensity
 from sklearn.utils.validation import check_is_fitted
 from tqdm import tqdm
 
+from pypolyphonicanalysis.datamodel.features.features import Features
 from pypolyphonicanalysis.datamodel.tracks.track import (
     track_is_saved,
     load_track,
@@ -97,7 +98,7 @@ class AutomaticAnalysisRunner:
         self._output_path = path
 
     def _estimate_recording_f0s(self, recording: Recording) -> FloatArray:
-        return self._model.predict_on_file(recording.file_path)
+        return self._model.predict_on_file(recording.file_path)[Features.SALIENCE_MAP]
 
     def _save_f0s(
         self,

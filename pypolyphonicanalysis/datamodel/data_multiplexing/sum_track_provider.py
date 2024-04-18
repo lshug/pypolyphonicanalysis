@@ -1,8 +1,9 @@
 from enum import Enum
-from typing import Iterable, TypedDict, TypeVar
+from typing import Iterable, TypeVar
 
 from tqdm import tqdm
 
+from pypolyphonicanalysis.datamodel.data_multiplexing.splits import SumTrackSplitType, TrainTestValidationSplit
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
@@ -12,18 +13,6 @@ from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_random_number_generator
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 from joblib import Parallel, delayed
-
-
-class SumTrackSplitType(Enum):
-    TRAIN = 0
-    TEST = 1
-    VALIDATION = 2
-
-
-class TrainTestValidationSplit(TypedDict):
-    train: list[str]
-    test: list[str]
-    validation: list[str]
 
 
 class SummingModes(Enum):
@@ -66,6 +55,7 @@ def process_multitrack_with_summing_strategies(
     multitrack: Multitrack,
     summing_strategies: list[BaseSummingStrategy],
     pitch_shift_probabilities: dict[float, float] | None,
+    pitch_shift_displacement_range: tuple[float, float],
     sum_track_processors: list[BaseSumTrackProcessor] | None,
     summing_mode: SummingModes,
     settings: Settings,
@@ -79,7 +69,8 @@ def process_multitrack_with_summing_strategies(
     else:
         for shift, probability in pitch_shift_probabilities.items():
             if rng.random() <= probability:
-                augmented_multitracks.append(multitrack.pitch_shift(shift))
+                displacement = rng.uniform(pitch_shift_displacement_range[0], pitch_shift_displacement_range[1])
+                augmented_multitracks.append(multitrack.pitch_shift(shift + displacement))
     for multitrack in augmented_multitracks:
         if summing_mode == SummingModes.RANDOM:
             sum_tracks = [rng.choice(summing_strategies).sum_or_retrieve(multitrack)]
@@ -115,12 +106,14 @@ class SumTrackProvider:
         train_test_validation_split: TrainTestValidationSplit | None = None,
         dataloaders_and_summing_strategies: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]] | None = None,
         pitch_shift_probabilities: dict[float, float] | None = None,
+        pitch_shift_displacement_range: tuple[float, float] = (0, 0),
         sum_track_processors: list[BaseSumTrackProcessor] | None = None,
         summing_mode: SummingModes = SummingModes.ALL,
     ):
         self._train_test_validation_split = train_test_validation_split
         self._dataloaders_and_summing_strategies = dataloaders_and_summing_strategies
         self._pitch_shift_probabilities = pitch_shift_probabilities
+        self._pitch_shift_displacement_range = pitch_shift_displacement_range
         self._sum_track_processors = sum_track_processors
         self._settings = settings
         self._summing_mode = summing_mode
@@ -142,7 +135,13 @@ class SumTrackProvider:
         for multitrack_list in tqdm(multitrack_lists, desc="Processing dataloader partitions", total=len(dataloader_partitions)):
             sum_track_with_splits_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_multitrack_processing_jobs_per_dataloader_partition, return_as="generator")(
                 delayed(process_multitrack_with_summing_strategies)(
-                    multitrack, summing_strategies, self._pitch_shift_probabilities, self._sum_track_processors, self._summing_mode, self._settings
+                    multitrack,
+                    summing_strategies,
+                    self._pitch_shift_probabilities,
+                    self._pitch_shift_displacement_range,
+                    self._sum_track_processors,
+                    self._summing_mode,
+                    self._settings,
                 )
                 for multitrack, summing_strategies in multitrack_list
             )

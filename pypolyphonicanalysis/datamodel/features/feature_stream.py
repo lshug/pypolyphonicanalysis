@@ -17,28 +17,28 @@ class FeatureStream:
         self._number_of_slices = settings.training_input_number_of_slices
         self._feature_store = get_feature_store(settings)
         self._rng = get_random_state(settings)
+        self._input_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._input_features]
+        self._label_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._label_features]
+        self._n_t = self._input_feature_arrs[0].shape[-1]
 
     def __iter__(self) -> "FeatureStream":
         return self
 
     def __next__(self) -> tuple[list[FloatArray], list[FloatArray]]:
-        input_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._input_features]
-        label_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._label_features]
-        n_t = input_feature_arrs[0].shape[-1]
         input_slices_list = []
         label_slices_batch = []
         for idx in range(self._batch_size):
-            slice_idx = self._rng.randint(0, n_t - self._batch_size + 1)
-            input_slices = [arr[..., slice_idx : slice_idx + self._batch_size] for arr in input_feature_arrs]
-            label_slices = [arr[..., slice_idx : slice_idx + self._batch_size] for arr in label_feature_arrs]
+            slice_idx = self._rng.randint(0, self._n_t - self._batch_size + 1)
+            input_slices = [arr[..., slice_idx : slice_idx + self._number_of_slices] for arr in self._input_feature_arrs]
+            label_slices = [arr[..., slice_idx : slice_idx + self._number_of_slices] for arr in self._label_feature_arrs]
             input_slices_list.append(input_slices)
             label_slices_batch.append(label_slices)
         input_batches = []
-        for idx in range(len(input_feature_arrs)):
-            input_batches.append(np.vstack([slice[idx] for slice in input_slices_list]))
+        for idx in range(len(self._input_feature_arrs)):
+            input_batches.append(np.stack([slice[idx] for slice in input_slices_list]))
         label_batches = []
-        for idx in range(len(label_feature_arrs)):
-            label_batches.append(np.vstack([slice[idx] for slice in label_feature_arrs]))
+        for idx in range(len(self._label_feature_arrs)):
+            label_batches.append(np.stack([slice[idx] for slice in label_slices_batch]))
         return input_batches, label_batches
 
     def __hash__(self) -> int:

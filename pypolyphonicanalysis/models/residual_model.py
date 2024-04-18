@@ -2,7 +2,7 @@ import torch
 from torch import nn
 
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature, Features
-from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import BaseMultipleF0EstimationModel, get_models_path
+from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import BaseMultipleF0EstimationModel
 from pypolyphonicanalysis.settings import Settings
 
 
@@ -49,16 +49,9 @@ class ResidualNNModule(nn.Module):
 
 
 class ResidualModel(BaseMultipleF0EstimationModel):
-    def __init__(self, model: str | None, settings: Settings) -> None:
-        super().__init__(settings)
-        self._model = ResidualNNModule(settings)
-        if model is not None:
-            self._model.load_state_dict(torch.load(get_models_path(self._settings).joinpath(model).absolute().as_posix()))
-        self._model = self._model.to(self._device)
 
-    @property
-    def model(self) -> nn.Module:
-        return self._model
+    def _create_model(self) -> nn.Module:
+        return ResidualNNModule(self._settings)
 
     @property
     def model_input_features(self) -> list[InputFeature]:

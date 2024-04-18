@@ -1,12 +1,14 @@
+from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.evaluation.test_set_evaluator import (
     TestSetEvaluator,
 )
 from pypolyphonicanalysis.models.baseline_model import BaselineModel
 from pypolyphonicanalysis.settings import Settings
-
+from pypolyphonicanalysis.utils.utils import get_train_test_validation_split
 
 settings = Settings()
 
-model = BaselineModel("model.pth", settings)
-evaluator = TestSetEvaluator(settings=settings, max_count=10)
+model = BaselineModel(settings, "model")
+sum_track_provider = SumTrackProvider(settings, train_test_validation_split=get_train_test_validation_split("train_test_validation_split", settings))
+evaluator = TestSetEvaluator(sum_track_provider, settings=settings, max_count=40)
 evaluation = evaluator.evaluate_model(model)
