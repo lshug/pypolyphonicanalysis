@@ -13,20 +13,17 @@ class RecombinationDataLoader(BaseDataLoader):
         dataloaders: list[BaseDataLoader],
         settings: Settings,
         max_track_yields_per_dataloader_per_multitrack: int = 10,
-        tracks_per_multitrack_lb: int = 2,
-        tracks_per_multitrack_ub: int = 5,
-        pitch_shift_lb: int = 0,
-        pitch_shift_ub: int = 0,
+        tracks_per_multitrack_bounds: tuple[int, int] = (2, 5),
+        pitch_shift_bounds: tuple[float, float] = (0, 0),
         with_replacement: bool = True,
         maxlen: int = 60000,
     ) -> None:
         super().__init__(True, settings, maxlen)
         self._dataloaders = dataloaders
         self._max_track_yields_per_dataloader_per_multitrack = max_track_yields_per_dataloader_per_multitrack
-        self._tracks_per_multitrack_lb = tracks_per_multitrack_lb
-        self._tracks_per_multitrack_ub = tracks_per_multitrack_ub
-        self._pitch_shift_lb = pitch_shift_lb
-        self._pitch_shift_ub = pitch_shift_ub
+        self._tracks_per_multitrack_lb = tracks_per_multitrack_bounds[0]
+        self._tracks_per_multitrack_ub = tracks_per_multitrack_bounds[1]
+        self._pitch_shift_bounds = pitch_shift_bounds
         self._with_replacement = with_replacement
         self._maxlen = maxlen
 
@@ -45,7 +42,7 @@ class RecombinationDataLoader(BaseDataLoader):
             number_of_tracks = max(len(loaded_tracks), number_of_tracks)
             tracks: list[Track] = self._random.choices(loaded_tracks, k=number_of_tracks) if self._with_replacement else self._random.sample(loaded_tracks, k=number_of_tracks)
             for idx, track in enumerate(tracks):
-                pitch_shift = self._random.randint(self._pitch_shift_lb, self._pitch_shift_ub)
+                pitch_shift = self._random.uniform(self._pitch_shift_bounds[0], self._pitch_shift_bounds[1])
                 if pitch_shift != 0:
                     tracks[idx] = track.pitch_shift(pitch_shift)
             yield Multitrack(tracks)

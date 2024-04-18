@@ -19,6 +19,8 @@ from pypolyphonicanalysis.datamodel.dataloaders.recombination_data_loader import
 from pypolyphonicanalysis.datamodel.features.features import Features
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.summing_strategies.direct_sum import DirectSum
+from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
+from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum
 from pypolyphonicanalysis.models.baseline_model import BaselineModel
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
@@ -34,8 +36,8 @@ feature_store = get_feature_store(settings)
 
 summing_strategies: list[BaseSummingStrategy] = [
     DirectSum(settings),
-    # ReverbSum(settings),
-    # RoomSimulationSum(settings, (10, 7.5, 3.5), (2.5, 3.73, 1.76), [(4, 4.6, 1.6), (4.5, 4.8, 1.8), (5, 4.85, 1.7), (5.5, 4.8, 1.6), (6, 4.6, 1.9)], rt60=1.0, max_rand_disp=0.5),
+    ReverbSum(settings),
+    RoomSimulationSum(settings, (10, 7.5, 3.5), (2.5, 3.73, 1.76), [(4, 4.6, 1.6), (4.5, 4.8, 1.8), (5, 4.85, 1.7), (5.5, 4.8, 1.6), (6, 4.6, 1.9)], rt60=1.0, max_rand_disp=0.5),
 ]
 
 monophonic_tracks_source_path = Path(settings.data_directory_path).joinpath("corpora").joinpath("monophonic_collections").joinpath("SingingVoiceDataset").joinpath("monophonic")
@@ -76,7 +78,7 @@ test_size = int((1 - settings.validation_proportion) * (settings.test_validation
 
 MODEL_NAME = "model_train"
 LR = 0.01
-EPOCHS = 2
+EPOCHS = 150
 
 loss_fn = nn.KLDivLoss()
 optimizer = torch.optim.AdamW(torch_model.parameters(), lr=LR)

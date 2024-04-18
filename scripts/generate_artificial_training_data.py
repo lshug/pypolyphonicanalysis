@@ -30,8 +30,7 @@ summing_strategies: list[BaseSummingStrategy] = [
 dataset_loaders: list[BaseDataLoader] = [
     RecombinationDataLoader(
         [MonophonicTrackCollectionDataLoader(True, monophonic_tracks, settings)],
-        pitch_shift_lb=-2,
-        pitch_shift_ub=2,
+        pitch_shift_bounds=(-2, 2),
         settings=settings,
     )
 ]
