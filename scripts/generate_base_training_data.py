@@ -14,6 +14,10 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
 from pypolyphonicanalysis.datamodel.summing_strategies.direct_sum import DirectSum
 from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
 from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum, RelativePositionRange
+from pypolyphonicanalysis.processing.sum_track.add_noise import AddNoise
+from pypolyphonicanalysis.processing.sum_track.base_sum_track_processor import BaseSumTrackProcessor
+from pypolyphonicanalysis.processing.sum_track.distort import Distort
+from pypolyphonicanalysis.processing.sum_track.filter import Filter
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 from pypolyphonicanalysis.utils.utils import save_train_test_validation_split
@@ -50,7 +54,15 @@ dataset_loaders: list[BaseDataLoader] = [
 ]
 dataloaders_and_summing_strategies: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]] = [(dl, summing_strategies) for dl in dataset_loaders]
 pitch_shift_probabilities = {-2: 0.5, -1.5: 0.5, -1: 0.5, -0.3: 0.5, 0: 1, 0.3: 0.5, 1: 0.5, 1.5: 0.5, 2: 0.5}
-sum_track_provider = SumTrackProvider(settings, dataloaders_and_summing_strategies=dataloaders_and_summing_strategies, pitch_shift_probabilities=pitch_shift_probabilities)
+pitch_shift_displacement_range = (-0.2, 0.2)
+sum_track_processors: list[BaseSumTrackProcessor] = [AddNoise(settings), Filter(settings), Distort(settings)]
+sum_track_provider = SumTrackProvider(
+    settings,
+    dataloaders_and_summing_strategies=dataloaders_and_summing_strategies,
+    pitch_shift_probabilities=pitch_shift_probabilities,
+    pitch_shift_displacement_range=(-0.2, 0.2),
+    sum_track_processors=sum_track_processors,
+)
 
 split_dict: dict[SumTrackSplitType, list[str]] = {SumTrackSplitType.TRAIN: [], SumTrackSplitType.TEST: [], SumTrackSplitType.VALIDATION: []}
 

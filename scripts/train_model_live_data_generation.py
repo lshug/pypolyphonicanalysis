@@ -29,7 +29,7 @@ from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_st
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-settings = Settings(use_depthwise_separable_convolution_when_possible=False, use_self_attention=True, training_batch_size=8)
+settings = Settings(use_depthwise_separable_convolution_when_possible=True, use_self_attention=True, training_batch_size=8)
 shuffle = False
 
 feature_store = get_feature_store(settings)
@@ -102,7 +102,7 @@ best_loss_epoch = -1
 for epoch in tqdm(range(EPOCHS)):
     train, _, validation = mux.get_feature_iterators()
     model.train_on_feature_iterable(train, optimizer, train_len)
-    validation_loss = model.validate_on_feature_iterable(validation, validation_len)
+    validation_loss, evaluation_metrics = model.validate_on_feature_iterable(validation, validation_len)
     scheduler.step(validation_loss)
     if validation_loss < best_loss:
         best_loss = validation_loss

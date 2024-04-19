@@ -35,11 +35,17 @@ def recall(prediction: torch.Tensor, label: torch.Tensor) -> float:
     negatives_on_pred: torch.Tensor = rounded_pred == 0
     true_negatives = float(torch.sum(negatives_on_pred.float() * negatives_on_label.float()).item())
     false_negatives = true_negatives - float(torch.sum(negatives_on_pred.float()))
-    return true_positives / (true_positives + false_negatives)
+    reciprocal = true_positives + false_negatives
+    if reciprocal == 0:
+        return math.inf
+    return true_positives / reciprocal
 
 
 def f1(prediction: torch.Tensor, label: torch.Tensor) -> float:
-    return 2 / ((1 / precision(prediction, label)) + (1 / recall(prediction, label)))
+    reciprocal = (1 / precision(prediction, label)) + (1 / recall(prediction, label))
+    if reciprocal == 0:
+        return math.inf
+    return 2 / reciprocal
 
 
 evaluation_metric_calculation_functions: dict[EvaluationMetrics, Callable[[torch.Tensor, torch.Tensor], float]] = {

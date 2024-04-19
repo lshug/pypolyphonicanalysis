@@ -42,7 +42,7 @@ best_loss_epoch = -1
 for epoch in tqdm(range(EPOCHS)):
     train, _, validation = mux.get_feature_iterators()
     model.train_on_feature_iterable(train, optimizer, train_len)
-    validation_loss = model.validate_on_feature_iterable(validation, validation_len)
+    validation_loss, evaluation_metrics = model.validate_on_feature_iterable(validation, validation_len)
     scheduler.step(validation_loss)
     if validation_loss < best_loss:
         best_loss = validation_loss

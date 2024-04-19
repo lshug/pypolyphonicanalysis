@@ -1,6 +1,7 @@
 import logging
 import math
 from abc import abstractmethod
+from collections import defaultdict
 from pathlib import Path
 from typing import Iterator
 
@@ -11,7 +12,7 @@ from tqdm import tqdm
 
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
-from pypolyphonicanalysis.models.evaluation_metrics import get_evaluation_metrics_for_model_outputs
+from pypolyphonicanalysis.models.evaluation_metrics import get_evaluation_metrics_for_model_outputs, EvaluationMetrics
 from pypolyphonicanalysis.models.losses import get_train_loss_function, get_eval_loss_function
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
@@ -125,10 +126,13 @@ class BaseMultipleF0EstimationModel:
             batch_count += 1
             logger.info(f"Batch {batch_count}: average loss={total_loss / batch_count}, last loss={last_loss}")
 
-    def validate_on_feature_iterable(self, validation_iterator: Iterator[tuple[list[FloatArray], list[FloatArray]]], expected_iter_length: int | None = None) -> float:
+    def validate_on_feature_iterable(
+        self, validation_iterator: Iterator[tuple[list[FloatArray], list[FloatArray]]], expected_iter_length: int | None = None
+    ) -> tuple[float, dict[EvaluationMetrics, float]]:
         total_loss: float = 0
         batch_count = 0
         self.model.eval()
+        evaluation_metric_aggregates: dict[EvaluationMetrics, list[float]] = defaultdict(list)
         with torch.no_grad():
             for input_features, label_features in tqdm(validation_iterator, desc="Validation", total=expected_iter_length):
                 input_feature_tensors = [torch.from_numpy(arr).float().to(self._device) for arr in input_features]
@@ -138,6 +142,8 @@ class BaseMultipleF0EstimationModel:
                     torch.stack([get_eval_loss_function(feature)(model_output[feature], label_feature_tensors[idx]) for idx, (feature, output) in enumerate(model_output.items())])
                 )
                 evaluation_metrics = get_evaluation_metrics_for_model_outputs(model_output, label_feature_tensors)
+                for metric, val in evaluation_metrics.items():
+                    evaluation_metric_aggregates[metric].append(val)
                 evaluation_metrics_strings = [f"{metric.value}={val}" for metric, val in evaluation_metrics.items()]
                 last_loss: float = loss.item()
                 total_loss += last_loss
@@ -145,8 +151,13 @@ class BaseMultipleF0EstimationModel:
                 logger.info(f"Average loss={total_loss / batch_count}, last loss={last_loss}, {', '.join(evaluation_metrics_strings)}")
         if batch_count == 0:
             logger.warning("Empty validation iterator encountered")
-            return math.inf
-        return total_loss / batch_count
+            average_loss = math.inf
+        else:
+            average_loss = total_loss / batch_count
+        evaluation_metric_averages: dict[EvaluationMetrics, float] = {metric: float(np.mean(aggregate_list)) for metric, aggregate_list in evaluation_metric_aggregates.items()}
+        evaluation_metrics_averages_strings = [f"{metric.value}={val}" for metric, val in evaluation_metric_averages.items()]
+        logger.info(f"Metric average values: loss={average_loss}, {', '.join(evaluation_metrics_averages_strings)}")
+        return average_loss, evaluation_metric_averages
 
     def save(self, name: str) -> None:
         torch.save(self.model.state_dict(), get_models_path(self._settings).joinpath(f"{name}.pth").absolute().as_posix())
