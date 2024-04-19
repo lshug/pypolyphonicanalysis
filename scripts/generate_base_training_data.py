@@ -93,7 +93,7 @@ def filter_gvm_sum_tracks(sum_tracks: list[str]) -> list[str]:
 
 
 save_train_test_validation_split(
-    "base_data_split_nogvm",
+    "base_data_split_noevengvm",
     {
         "train": filter_gvm_sum_tracks(split_dict[SumTrackSplitType.TRAIN]),
         "test": filter_gvm_sum_tracks(split_dict[SumTrackSplitType.TEST]),

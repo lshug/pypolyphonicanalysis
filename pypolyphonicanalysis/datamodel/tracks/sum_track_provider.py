@@ -59,6 +59,7 @@ def process_multitrack_with_summing_strategies(
     summing_mode: SummingModes,
     settings: Settings,
 ) -> list[tuple[SumTrack, SumTrackSplitType]]:
+    multitrack_split = generate_random_split(settings)
     rng = get_random_number_generator(settings)
     feature_store = get_feature_store(settings)
     augmented_multitracks: list[Multitrack] = []
@@ -72,10 +73,11 @@ def process_multitrack_with_summing_strategies(
                 augmented_multitracks.append(multitrack.pitch_shift(shift + displacement))
     for multitrack in augmented_multitracks:
         if summing_mode == SummingModes.RANDOM:
-            sum_tracks = [rng.choice(summing_strategies).sum_or_retrieve(multitrack)]
+            summing_strategy = rng.choice(summing_strategies)
+            sum_tracks_with_split_preferences = [(summing_strategy.sum_or_retrieve(multitrack), summing_strategy.split_override)]
         else:
-            sum_tracks = [summing_strategy.sum_or_retrieve(multitrack) for summing_strategy in summing_strategies]
-        for sum_track in sum_tracks:
+            sum_tracks_with_split_preferences = [(summing_strategy.sum_or_retrieve(multitrack), summing_strategy.split_override) for summing_strategy in summing_strategies]
+        for sum_track, split_preference in sum_tracks_with_split_preferences:
             if sum_track_processors is not None:
                 for processor in sum_track_processors:
                     sum_track = processor.process(sum_track)
@@ -83,7 +85,7 @@ def process_multitrack_with_summing_strategies(
                 sum_track.save()
             for feature in settings.sum_track_provider_features_to_generate_early:
                 feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
-            sum_tracks_with_splits.append((sum_track, generate_random_split(settings)))
+            sum_tracks_with_splits.append((sum_track, multitrack_split if split_preference is None else split_preference))
     return sum_tracks_with_splits
 
 

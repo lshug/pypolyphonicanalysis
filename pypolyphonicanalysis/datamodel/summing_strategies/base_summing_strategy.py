@@ -2,6 +2,7 @@ import abc
 from abc import abstractmethod
 
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
+from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType
 from pypolyphonicanalysis.datamodel.tracks.sum_track import (
     SumTrack,
     load_sum_track,
@@ -39,3 +40,7 @@ class BaseSummingStrategy(abc.ABC):
     @abstractmethod
     def is_summable(self, multitrack: Multitrack) -> bool:
         """Returns a boolean value indicating whether the strategy is able to sum the given multitrack."""
+
+    @property
+    def split_override(self) -> SumTrackSplitType | None:
+        return None

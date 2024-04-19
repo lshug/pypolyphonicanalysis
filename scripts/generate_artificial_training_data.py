@@ -91,7 +91,7 @@ try:
         settings,
     )
 
-    base_data_split_nogvm = get_train_test_validation_split("base_data_split_nogvm", settings)
+    base_data_split_nogvm = get_train_test_validation_split("base_data_split_noevengvm", settings)
     joint_data_split_nogvm: TrainTestValidationSplit = {
         "train": base_data_split_nogvm["train"] + artificial_data_split["train"],
         "test": base_data_split_nogvm["test"] + artificial_data_split["test"],
@@ -100,7 +100,7 @@ try:
     for split_list in [joint_data_split_nogvm["train"], joint_data_split_nogvm["test"], joint_data_split_nogvm["validation"]]:
         random.shuffle(split_list)
     save_train_test_validation_split(
-        "joint_data_split_nogvm",
+        "joint_data_split_noevengvm",
         joint_data_split,
         settings,
     )
