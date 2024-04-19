@@ -21,9 +21,9 @@ class Distort(BaseSumTrackProcessor):
             shuffle=True,
         )
 
-    def process(self, sum_track: SumTrack) -> SumTrack:
+    def _process(self, sum_track: SumTrack) -> SumTrack:
         augmented = self._augment(sum_track.audio_array, self._settings.sr)
         return SumTrack(self.get_sum_track_name(sum_track), augmented, sum_track.source_multitrack, self._settings)
 
-    def get_sum_track_name(self, sum_track: SumTrack) -> str:
-        return f"{sum_track.name}_distort"
+    def get_sum_track_name_from_base_sumtrack_name(self, sum_track_name: str) -> str:
+        return f"{sum_track_name}_distort"

@@ -50,6 +50,24 @@ def get_multitrack_generator_from_dataloader_partition(
             dataloader_iters.remove((loader, summing_strategies))
 
 
+def process_sum_track(sum_track: SumTrack, sum_track_processors: list[BaseSumTrackProcessor] | None, settings: Settings) -> SumTrack:
+    feature_store = get_feature_store(settings)
+    if sum_track_processors is not None:
+        expected_name = sum_track.name
+        for processor in sum_track_processors:
+            expected_name = processor.get_sum_track_name_from_base_sumtrack_name(expected_name)
+        if sum_track_is_saved(expected_name, settings):
+            sum_track = load_sum_track(expected_name, settings)
+        else:
+            for processor in sum_track_processors:
+                sum_track = processor.process_or_load(sum_track)
+    if settings.save_raw_training_data:
+        sum_track.save()
+    for feature in settings.sum_track_provider_features_to_generate_early:
+        feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
+    return sum_track
+
+
 def process_multitrack_with_summing_strategies(
     multitrack: Multitrack,
     summing_strategies: list[BaseSummingStrategy],
@@ -61,7 +79,6 @@ def process_multitrack_with_summing_strategies(
 ) -> list[tuple[SumTrack, SumTrackSplitType]]:
     multitrack_split = generate_random_split(settings)
     rng = get_random_number_generator(settings)
-    feature_store = get_feature_store(settings)
     augmented_multitracks: list[Multitrack] = []
     sum_tracks_with_splits: list[tuple[SumTrack, SumTrackSplitType]] = []
     if pitch_shift_probabilities is None:
@@ -78,13 +95,7 @@ def process_multitrack_with_summing_strategies(
         else:
             sum_tracks_with_split_preferences = [(summing_strategy.sum_or_retrieve(multitrack), summing_strategy.split_override) for summing_strategy in summing_strategies]
         for sum_track, split_preference in sum_tracks_with_split_preferences:
-            if sum_track_processors is not None:
-                for processor in sum_track_processors:
-                    sum_track = processor.process(sum_track)
-            if settings.save_raw_training_data:
-                sum_track.save()
-            for feature in settings.sum_track_provider_features_to_generate_early:
-                feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
+            sum_track = process_sum_track(sum_track, sum_track_processors, settings)
             sum_tracks_with_splits.append((sum_track, multitrack_split if split_preference is None else split_preference))
     return sum_tracks_with_splits
 
