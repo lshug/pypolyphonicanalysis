@@ -9,6 +9,9 @@ class Multitrack:
     def __init__(self, tracks: Iterable[Track]) -> None:
         self._tracks = tuple(tracks)
         if len(self._tracks) > 0:
+            for track in self._tracks:
+                if track.settings.save_multitrack_tracks_pre_trimming:
+                    track.save()
             self._trim_tracks()
 
     def _trim_tracks(self) -> None:

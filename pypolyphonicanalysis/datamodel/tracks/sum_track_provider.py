@@ -3,7 +3,7 @@ from typing import Iterable, TypeVar
 
 from tqdm import tqdm
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.splits import SumTrackSplitType, TrainTestValidationSplit
+from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType, TrainTestValidationSplit
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
@@ -23,9 +23,8 @@ class SummingModes(Enum):
 T = TypeVar("T")
 
 
-def partition_list(list_to_partition: list[T], n: int) -> Iterable[list[T]]:
-    for idx in range(0, n):
-        yield list_to_partition[idx::n]
+def partition_list(list_to_partition: list[T], n: int) -> list[list[T]]:
+    return [list_to_partition[idx::n] for idx in range(n)]
 
 
 def generate_random_split(settings: Settings) -> SumTrackSplitType:
@@ -130,7 +129,7 @@ class SumTrackProvider:
 
     def _get_sum_tracks_from_dataloaders(self) -> SumTrackWithSplitIterable:
         assert self._dataloaders_and_summing_strategies is not None
-        dataloader_partitions = list(partition_list(self._dataloaders_and_summing_strategies, self._settings.sum_track_provider_number_of_dataloader_partition_jobs))
+        dataloader_partitions = partition_list(self._dataloaders_and_summing_strategies, self._settings.sum_track_provider_number_of_dataloader_partition_jobs)
         multitrack_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_dataloader_partition_jobs, return_as="generator", verbose=5)(
             delayed(get_multitracks_from_dataloader_partition)(partition, self._settings) for partition in dataloader_partitions
         )

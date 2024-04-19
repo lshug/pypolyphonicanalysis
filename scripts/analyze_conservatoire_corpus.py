@@ -51,7 +51,7 @@ for file in os.listdir(os.path.join(settings.data_directory_path, "corpora", "GV
         )
 
 
-analyzer = AutomaticAnalysisRunner(Path("output/svaneti_out/"), model, processors, settings, Path("activation_cache"))
+analyzer = AutomaticAnalysisRunner(Path("output/svaneti_out/"), model, processors, settings)
 svaneti_results = analyzer.generate_analysis_results(svaneti_recordings)
 
 analyzer.set_output_path(Path("output/kakheti_out/"))

@@ -1,4 +1,4 @@
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
+from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.evaluation.test_set_evaluator import (
     TestSetEvaluator,
 )

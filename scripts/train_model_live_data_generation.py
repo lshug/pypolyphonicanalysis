@@ -8,7 +8,7 @@ from torch import nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_feature_stream_mux import SumTrackFeatureStreamMux
+from pypolyphonicanalysis.datamodel.tracks.sum_track_feature_stream_mux import SumTrackFeatureStreamMux
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
 from pypolyphonicanalysis.datamodel.dataloaders.csd_data_loader import CSDDataloader
 from pypolyphonicanalysis.datamodel.dataloaders.dcs_data_loader import DCSDataLoader
@@ -20,10 +20,10 @@ from pypolyphonicanalysis.datamodel.features.features import Features
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.summing_strategies.direct_sum import DirectSum
 from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
-from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum
+from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum, RelativePositionRange
 from pypolyphonicanalysis.models.baseline_model import BaselineModel
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
+from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
 logger = logging.getLogger(__name__)
@@ -40,16 +40,16 @@ summing_strategies: list[BaseSummingStrategy] = [
     RoomSimulationSum(
         settings,
         room_dim_range=((10, 10), (7.5, 8.5), (3.5, 4.5)),
-        mic_position_range=((0.2, 0.3), (0.48, 0.52), (0.48, 0.52)),
+        mic_position_range=RelativePositionRange(((0.2, 0.3), (0.48, 0.52), (0.48, 0.52))),
         source_position_ranges=[
-            ((0.39, 0.41), (0.59, 0.61), (0.34, 0.36)),
-            ((0.44, 0.64), (0.61, 0.63), (0.39, 0.41)),
-            ((0.49, 0.51), (0.62, 0.64), (0.35, 0.38)),
-            ((0.54, 0.56), (0.61, 0.63), (0.34, 0.36)),
-            ((0.59, 0.61), (0.59, 0.61), (0.39, 0.41)),
+            RelativePositionRange(((0.39, 0.41), (0.59, 0.61), (0.34, 0.36))),
+            RelativePositionRange(((0.44, 0.64), (0.61, 0.63), (0.39, 0.41))),
+            RelativePositionRange(((0.49, 0.51), (0.62, 0.64), (0.35, 0.38))),
+            RelativePositionRange(((0.54, 0.56), (0.61, 0.63), (0.34, 0.36))),
+            RelativePositionRange(((0.59, 0.61), (0.59, 0.61), (0.39, 0.41))),
         ],
         rt60_range=(0.3, 0.8),
-        max_rand_disp_range=(0.03, 0.06),
+        max_rand_disp_rel_range=(0.03, 0.06),
     ),
 ]
 

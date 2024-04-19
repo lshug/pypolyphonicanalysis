@@ -6,11 +6,11 @@ from torch import nn
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from tqdm import tqdm
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_feature_stream_mux import SumTrackFeatureStreamMux
+from pypolyphonicanalysis.datamodel.tracks.sum_track_feature_stream_mux import SumTrackFeatureStreamMux
 from pypolyphonicanalysis.datamodel.features.features import Features
 from pypolyphonicanalysis.models.baseline_model import BaselineModel
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
+from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.utils.utils import get_train_test_validation_split
 
 logger = logging.getLogger(__name__)

@@ -14,7 +14,7 @@ import numpy.typing as npt
 import scipy
 from matplotlib import pyplot as plt
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.splits import TrainTestValidationSplit
+from pypolyphonicanalysis.datamodel.tracks.splits import TrainTestValidationSplit
 from pypolyphonicanalysis.settings import Settings
 
 FloatArray = npt.NDArray[np.float32]
