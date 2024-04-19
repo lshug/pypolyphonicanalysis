@@ -21,7 +21,7 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
 from pypolyphonicanalysis.datamodel.summing_strategies.direct_sum import DirectSum
 from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
 from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum, RelativePositionRange
-from pypolyphonicanalysis.models.baseline_model import BaselineModel
+from pypolyphonicanalysis.models.residual_model import ResidualModel
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
@@ -29,7 +29,7 @@ from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_st
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
-settings = Settings()
+settings = Settings(use_depthwise_separable_convolution_when_possible=False, use_self_attention=True, training_batch_size=8)
 shuffle = False
 
 feature_store = get_feature_store(settings)
@@ -76,7 +76,7 @@ dataloaders_and_summing_strategies: list[tuple[BaseDataLoader, list[BaseSummingS
 sum_track_provider = SumTrackProvider(settings, dataloaders_and_summing_strategies=dataloaders_and_summing_strategies)
 mux = SumTrackFeatureStreamMux(sum_track_provider, [Features.HCQT_MAG, Features.HCQT_PHASE_DIFF], [Features.SALIENCE_MAP], settings)
 
-model = BaselineModel(settings)
+model = ResidualModel(settings)
 torch_model = model.model
 
 pitch_shift_augmentation_multiplier = 1 + (sum(prob for prob in pitch_shift_probabilities.values()) if pitch_shift_probabilities is not None else 0)

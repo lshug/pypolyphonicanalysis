@@ -28,7 +28,7 @@ class FeatureStream:
         input_slices_list = []
         label_slices_batch = []
         for idx in range(self._batch_size):
-            slice_idx = self._rng.randint(0, self._n_t - self._batch_size + 1)
+            slice_idx = self._rng.randint(0, self._n_t - self._number_of_slices + 1)
             input_slices = [arr[..., slice_idx : slice_idx + self._number_of_slices] for arr in self._input_feature_arrs]
             label_slices = [arr[..., slice_idx : slice_idx + self._number_of_slices] for arr in self._label_feature_arrs]
             input_slices_list.append(input_slices)

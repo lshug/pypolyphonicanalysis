@@ -2,32 +2,34 @@ import torch
 from torch import nn
 
 
-def Conv(in_channels: int, out_channels: int, kernel_size: int | tuple[int, int], depthwise_separabile: bool = False) -> nn.Module:
+def Conv(in_channels: int, out_channels: int, kernel_size: int | tuple[int, int], depthwise_separabile: bool = False, padding: str | int = "same", bias: bool = True) -> nn.Module:
     if not depthwise_separabile or out_channels % in_channels != 0:
-        return nn.Conv2d(in_channels, out_channels, kernel_size, padding="same")
-    return nn.Conv2d(in_channels, out_channels, kernel_size, groups=in_channels, padding="same")
+        return nn.Conv2d(in_channels, out_channels, kernel_size, padding=padding, bias=bias)
+    return nn.Conv2d(in_channels, out_channels, kernel_size, groups=in_channels, padding=padding, bias=bias)
 
 
 class SelfAttention(nn.Module):
-    # Adapted from Fastai
     def __init__(self, n_channels: int) -> None:
         super().__init__()
+        self._n_channels = n_channels
         self._query = self._conv(n_channels, n_channels // 8)
         self._key = self._conv(n_channels, n_channels // 8)
-        self._value = self._conv(n_channels, n_channels)
+        self._value = self._conv(n_channels, n_channels // 2)
+        self._out = self._conv(n_channels // 2, n_channels)
         self._gamma = nn.Parameter(torch.Tensor([0.0]))
 
     def _conv(self, n_in: int, n_out: int) -> nn.Module:
-        return torch.nn.utils.spectral_norm(nn.Conv1d(n_in, n_out, 1, bias=False))
+        return torch.nn.utils.spectral_norm(nn.Conv2d(n_in, n_out, 1, bias=False))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        size = x.size()
-        x = x.view(*size[:2], -1)
-        f, g, h = self._query(x), self._key(x), self._value(x)
-        beta = torch.softmax(torch.bmm(f.transpose(1, 2), g), dim=1)
-        o = self.gamma * torch.bmm(h, beta) + x
-        ret_val: torch.Tensor = o.view(*size).contiguous()
-        return ret_val
+        n_ftrs = x.shape[2] * x.shape[3]
+        f = self._query(x).view(-1, self._n_channels // 8, n_ftrs)
+        g = torch.max_pool2d(self._key(x), [2, 2]).view(-1, self._n_channels // 8, n_ftrs // 4)
+        h = torch.max_pool2d(self._value(x), [2, 2]).view(-1, self._n_channels // 2, n_ftrs // 4)
+        beta = torch.softmax(torch.bmm(f.transpose(1, 2), g), -1)
+        o = self._out(torch.bmm(h, beta.transpose(1, 2)).view(-1, self._n_channels // 2, x.shape[2], x.shape[3]))
+        output: torch.Tensor = self._gamma * o + x
+        return output
 
 
 class ResidualCNNBlockModule(nn.Module):

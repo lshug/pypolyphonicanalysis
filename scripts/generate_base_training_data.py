@@ -73,8 +73,11 @@ save_train_test_validation_split(
 )
 
 
+even_numbered_GVM_indicies = [f"GVM{str(idx).zfill(3)}" for idx in range(2, len(GVMDataLoader(shuffle, settings)) + 1, 2)]
+
+
 def filter_gvm_sum_tracks(sum_tracks: list[str]) -> list[str]:
-    return [sum_track for sum_track in sum_tracks if "GVM" not in sum_track]
+    return [sum_track for sum_track in sum_tracks if not any(gvm_index in sum_track for gvm_index in even_numbered_GVM_indicies)]
 
 
 save_train_test_validation_split(

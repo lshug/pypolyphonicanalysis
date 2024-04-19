@@ -15,10 +15,10 @@ class BaseFeatureToSalienceMapNNModule(nn.Module, abc.ABC):
         self._settings = settings
         self._depthwise = settings.use_depthwise_separable_convolution_when_possible
         self._bins = settings.bins_per_octave * settings.n_octaves
+        self._concatenated_channels = settings.feature_representation_channels * len(input_features)
         self._feature_representation_modules = nn.ModuleList([self._get_feature_representation_module(feature) for feature in input_features])
         self._joint_representation_module = self._get_joint_representation_module()
         self._flatten_channels = nn.Conv2d(settings.channels_pre_flattening, 1, 1)
-        self._concatenated_channels = settings.feature_representation_channels * len(input_features)
         if settings.use_self_attention:
             self._self_attention = SelfAttention(self._concatenated_channels)
 
