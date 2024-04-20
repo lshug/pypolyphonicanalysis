@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from pathlib import Path
@@ -17,6 +18,9 @@ from pypolyphonicanalysis.utils.utils import save_train_test_validation_split, g
 
 settings = Settings()
 shuffle = True
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 monophonic_tracks_source_path = Path(settings.data_directory_path).joinpath("corpora").joinpath("monophonic_collections").joinpath("SingingVoiceDataset").joinpath("monophonic")
 monophonic_tracks: dict[Path, Path | None] = {

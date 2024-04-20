@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
@@ -24,6 +25,9 @@ from pypolyphonicanalysis.utils.utils import save_train_test_validation_split, c
 
 settings = Settings()
 shuffle = True
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 feature_store = get_feature_store(settings)
 
