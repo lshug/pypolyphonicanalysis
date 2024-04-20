@@ -1,3 +1,4 @@
+import logging
 from collections import Counter
 from typing import Iterator
 
@@ -10,6 +11,8 @@ from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray, get_random_number_generator
 
 FeatureStreamIteratorType = Iterator[tuple[list[FloatArray], list[FloatArray]]]
+
+logger = logging.getLogger(__name__)
 
 
 class SumTrackFeatureStreamMux:
@@ -31,12 +34,15 @@ class SumTrackFeatureStreamMux:
     ) -> FeatureStreamIteratorType:
         first = True
         while first or len(queues[split_type]) != 0 or len(active_streams) != 0:
+            queue_sizes = {k: len(v) for k, v in queues.items()}
+            logger.debug(f"Multiplex loop for {split_type}, queue sizes: {queue_sizes}")
             first = False
             if len(active_streams) < self._number_of_streams:
                 try:
                     sum_track, sum_track_split_type = next(sum_track_iterator)
                     active_streams.append((FeatureStream(sum_track, self._input_features, self._label_features, self._settings), sum_track_split_type))
                 except StopIteration:
+                    logger.debug("Multiplexer ran out of unused streams")
                     pass
             if len(queues[split_type]) != 0:
                 yield queues[split_type].pop(-1)

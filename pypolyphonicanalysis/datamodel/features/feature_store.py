@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 from functools import cache
 from pathlib import Path
@@ -15,6 +16,8 @@ from pypolyphonicanalysis.datamodel.features.features import Features, InputFeat
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
+
+logger = logging.getLogger(__name__)
 
 
 def get_features_path(settings: Settings) -> Path:
@@ -76,7 +79,9 @@ class FeatureStore:
 
     def generate_or_load_feature_for_sum_track(self, sum_track: SumTrack, feature: Features) -> FloatArray:
         if feature_is_generated_for_sum_track(sum_track, feature, self._settings):
+            logger.debug(f"Loading saved feature {feature} for {sum_track}")
             return load_feature_for_sum_track(sum_track, feature, self._settings)
+        logger.debug(f"Generating feature {feature} for {sum_track}")
         return self._generate_feature_for_sum_track(sum_track, feature)
 
     def generate_all_features_for_sum_track(self, sum_track: SumTrack) -> None:
