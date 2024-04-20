@@ -7,7 +7,7 @@ import numpy as np
 from scipy.io import wavfile
 
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
-from pypolyphonicanalysis.datamodel.tracks.track import load_track, track_is_saved
+from pypolyphonicanalysis.datamodel.tracks.track import load_track
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
 
@@ -55,8 +55,6 @@ class SumTrack:
         self._audio_source = audio_source
         self._audio_array: FloatArray | None = None
         self._n_frames: int | None = None
-        if self._settings.save_raw_training_data:
-            self.save()
 
     @property
     def name(self) -> str:
@@ -91,9 +89,7 @@ class SumTrack:
         sum_tracks_path = get_sum_tracks_path(self._settings)
         sum_track_path = sum_tracks_path.joinpath(self.name)
         sum_track_path.mkdir(parents=True, exist_ok=True)
-        for track in self._source_multitrack:
-            if not track_is_saved(track.name, self._settings):
-                track.save()
+        self._source_multitrack.save()
         source_path: str
         match self._audio_source:
             case Path():

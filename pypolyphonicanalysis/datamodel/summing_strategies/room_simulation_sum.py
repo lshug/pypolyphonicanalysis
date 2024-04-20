@@ -1,3 +1,5 @@
+from typing import TypeVar, NewType
+
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import (
     BaseSummingStrategy,
 )
@@ -11,8 +13,12 @@ import numpy as np
 from pypolyphonicanalysis.utils.utils import FloatArray, get_random_number_generator
 
 Position = tuple[float, float, float]
+RelativePosition = NewType("RelativePosition", Position)
 Range = tuple[float, float]
 PositionRange = tuple[Range, Range, Range]
+RelativePositionRange = NewType("RelativePositionRange", PositionRange)
+
+PositionType = TypeVar("PositionType", bound=Position)
 
 
 def range_average(range: Range) -> float:
@@ -28,15 +34,15 @@ class RoomSimulationSum(BaseSummingStrategy):
         self,
         settings: Settings,
         room_dim_range: PositionRange,
-        mic_position_range: PositionRange,
-        source_position_ranges: list[PositionRange],
+        mic_position_range: RelativePositionRange,
+        source_position_ranges: list[RelativePositionRange],
         rt60_range: Range = (0.1, 0.5),
-        max_rand_disp_range: Range = (0, 0.1),
+        max_rand_disp_rel_range: Range = (0, 0.1),
     ) -> None:
         super().__init__(settings)
         self._rng = get_random_number_generator(settings)
         self._room_dim_range = room_dim_range
-        self._max_rand_disp_range = max_rand_disp_range
+        self._max_rand_disp_range = max_rand_disp_rel_range
         self._mic_position_range = mic_position_range
         self._rt60_range = rt60_range
         self._source_position_ranges = source_position_ranges
@@ -57,11 +63,20 @@ class RoomSimulationSum(BaseSummingStrategy):
             self._rng.uniform(position_range[2][0], position_range[2][1]),
         )
 
-    def _get_position_from_relative_position(self, relative_position: Position, room_dim: Position) -> Position:
+    def _get_relative_position_from_relative_position_range(self, relative_position_range: RelativePositionRange) -> RelativePosition:
+        return RelativePosition(
+            (
+                self._rng.uniform(relative_position_range[0][0], relative_position_range[0][1]),
+                self._rng.uniform(relative_position_range[1][0], relative_position_range[1][1]),
+                self._rng.uniform(relative_position_range[2][0], relative_position_range[2][1]),
+            )
+        )
+
+    def _get_position_from_relative_position(self, relative_position: RelativePosition, room_dim: Position) -> Position:
         return (relative_position[0] * room_dim[0], relative_position[1] * room_dim[1], relative_position[2] * room_dim[2])
 
-    def _get_position_from_relative_position_range(self, relative_position_range: PositionRange, room_dim: Position) -> Position:
-        return self._get_position_from_relative_position(self._get_position_from_position_range(relative_position_range), room_dim)
+    def _get_position_from_relative_position_range(self, relative_position_range: RelativePositionRange, room_dim: Position) -> Position:
+        return self._get_position_from_relative_position(self._get_relative_position_from_relative_position_range(relative_position_range), room_dim)
 
     def _get_sum(self, multitrack: Multitrack) -> tuple[FloatArray, Multitrack]:
         if len(multitrack) > len(self._source_position_ranges):

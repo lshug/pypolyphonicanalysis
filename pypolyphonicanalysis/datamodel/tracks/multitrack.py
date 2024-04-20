@@ -8,15 +8,26 @@ from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay
 class Multitrack:
     def __init__(self, tracks: Iterable[Track]) -> None:
         self._tracks = tuple(tracks)
+        self._untrimmed_tracks: tuple[Track, ...] = tuple()
         if len(self._tracks) > 0:
             self._trim_tracks()
-            for track in self._tracks:
-                if track.settings.save_raw_training_data:
-                    track.save()
+
+    def save(self) -> None:
+        for track in self._tracks:
+            track.save()
+        for track in self._untrimmed_tracks:
+            if track.settings.save_multitrack_tracks_pre_trimming:
+                track.save()
 
     def _trim_tracks(self) -> None:
         min_frames = min(track.n_frames for track in self._tracks)
-        self._tracks = tuple([track.trim_to_frames(min_frames) for track in self._tracks])
+        tracks = tuple([track.trim_to_frames(min_frames) for track in self._tracks])
+        untrimmed_tracks: list[Track] = []
+        for track in self._tracks:
+            if track not in tracks:
+                untrimmed_tracks.append(track)
+        self._tracks = tracks
+        self._untrimmed_tracks = tuple(untrimmed_tracks)
 
     def pitch_shift(self, n_steps: float) -> "Multitrack":
         return Multitrack([track.pitch_shift(n_steps) for track in self._tracks])

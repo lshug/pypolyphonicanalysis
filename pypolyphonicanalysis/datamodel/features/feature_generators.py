@@ -4,6 +4,7 @@ from pathlib import Path
 import librosa
 import numpy as np
 import pumpp
+from noisereduce import noisereduce
 from scipy.ndimage import filters
 
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
@@ -62,7 +63,12 @@ class HCQTMagPhaseDiffGenerator(InputFeatureGenerator):
         if file is None:
             hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(y=y, sr=self._settings.sr)
         else:
-            hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(file.absolute().as_posix())
+            if self._settings.denoise_file_audio_before_prediction:
+                y, _ = librosa.load(file.absolute().as_posix(), sr=self._settings.sr)
+                y = noisereduce.reduce_noise(y, self._settings.sr)
+                hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(y=y, sr=self._settings.sr)
+            else:
+                hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(file.absolute().as_posix())
         mag = hcqt_data["hcqt_phase_diff/mag"][0]
         phase_diff = hcqt_data["hcqt_phase_diff/dphase"][0]
         assert isinstance(mag, np.ndarray)

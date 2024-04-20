@@ -1,16 +1,27 @@
 import abc
 from abc import abstractmethod
 
-from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
+from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack, sum_track_is_saved, load_sum_track
+from pypolyphonicanalysis.settings import Settings
 
 
 class BaseSumTrackProcessor(abc.ABC):
-    @abstractmethod
-    def process(self, sum_track: SumTrack) -> SumTrack:
-        """
-        Returns processed times and freqs.
-        """
+    def __init__(self, settings: Settings) -> None:
+        self._settings = settings
+
+    def process_or_load(self, sum_track: SumTrack) -> SumTrack:
+        name = self.get_sum_track_name(sum_track)
+        if sum_track_is_saved(name, self._settings):
+            return load_sum_track(name, self._settings)
+        return self._process(sum_track)
 
     @abstractmethod
-    def get_stage_name(self) -> str:
-        """Gets processing stage name of current processor."""
+    def _process(self, sum_track: SumTrack) -> SumTrack:
+        pass
+
+    def get_sum_track_name(self, sum_track: SumTrack) -> str:
+        return self.get_sum_track_name_from_base_sumtrack_name(sum_track.name)
+
+    @abstractmethod
+    def get_sum_track_name_from_base_sumtrack_name(self, sum_track_name: str) -> str:
+        pass

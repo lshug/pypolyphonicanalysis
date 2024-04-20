@@ -6,6 +6,7 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
     BaseSummingStrategy,
 )
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
+from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType
 
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
@@ -27,3 +28,7 @@ class GroundTruthSum(BaseSummingStrategy):
             librosa.load(self._ground_truth_paths[frozenset(track.name for track in multitrack)].absolute().as_posix(), sr=self._settings.sr)[0],
             multitrack,
         )
+
+    @property
+    def split_override(self) -> SumTrackSplitType | None:
+        return SumTrackSplitType.TEST

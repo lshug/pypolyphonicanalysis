@@ -1,6 +1,7 @@
 import logging
 import math
 from abc import abstractmethod
+from collections import defaultdict
 from pathlib import Path
 from typing import Iterator
 
@@ -11,7 +12,7 @@ from tqdm import tqdm
 
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
-from pypolyphonicanalysis.models.evaluation_metrics import get_evaluation_metrics_for_model_outputs
+from pypolyphonicanalysis.models.evaluation_metrics import get_evaluation_metrics_for_model_outputs, EvaluationMetrics
 from pypolyphonicanalysis.models.losses import get_train_loss_function, get_eval_loss_function
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
@@ -31,14 +32,14 @@ class BaseMultipleF0EstimationModel:
         self._settings = settings
         self._feature_store = get_feature_store(self._settings)
         self._device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self._model_input_features = settings.input_features
         self._model: nn.Module | None = None
         if name is not None:
             self.model.load_state_dict(torch.load(get_models_path(self._settings).joinpath(f"{name}.pth").absolute().as_posix()))
 
     @property
-    @abstractmethod
-    def model_input_features(self) -> list[InputFeature]:
-        pass
+    def model_input_features(self) -> tuple[InputFeature, ...]:
+        return self._model_input_features
 
     @property
     @abstractmethod
@@ -59,7 +60,7 @@ class BaseMultipleF0EstimationModel:
         feature_array_tensors = [torch.from_numpy(arr).float().to(self._device) for arr in feature_arrays]
         self.model.eval()
         with torch.inference_mode():
-            prediction_tensors_dict: dict[LabelFeature, torch.Tensor] = self.model(*feature_array_tensors)
+            prediction_tensors_dict: dict[LabelFeature, torch.Tensor] = self.model(feature_array_tensors)
         prediction: dict[LabelFeature, FloatArray] = {feature: prediction_tensor.detach().cpu().numpy() for feature, prediction_tensor in prediction_tensors_dict.items()}
         return prediction
 
@@ -67,21 +68,13 @@ class BaseMultipleF0EstimationModel:
         batch_size = self._settings.inference_batch_size
         reshaped_feature_arrays: list[FloatArray] = []
         n_t = input_feature_arrays[0].shape[-1]
-        n_bins = self._settings.bins_per_octave * self._settings.n_octaves
-        n_harmonics = len(self._settings.harmonics)
         for feature_array in input_feature_arrays:
-            reshaped_feature_array = feature_array[np.newaxis, :, :, :]  # batch, harmonics, bins, t
+            reshaped_feature_array = feature_array[np.newaxis, ...]  # batch, harmonics, bins, t
             reshaped_feature_array_batch_list = [
-                reshaped_feature_array[:, :, :, t : t + self._settings.inference_input_number_of_slices] for t in range(0, n_t, self._settings.inference_input_number_of_slices)
+                reshaped_feature_array[..., t : t + self._settings.inference_input_number_of_slices] for t in range(0, n_t, self._settings.inference_input_number_of_slices)
             ]
-            zeros = np.zeros(
-                (
-                    1,
-                    n_harmonics,
-                    n_bins,
-                    self._settings.inference_input_number_of_slices - reshaped_feature_array_batch_list[-1].shape[3],
-                )
-            ).astype(np.float32)
+            number_of_remainder_slices = self._settings.inference_input_number_of_slices - reshaped_feature_array_batch_list[-1].shape[-1]
+            zeros = np.zeros(reshaped_feature_array.shape[:-1] + (number_of_remainder_slices,)).astype(np.float32)
             reshaped_feature_array_batch_list[-1] = np.concatenate([reshaped_feature_array_batch_list[-1], zeros], 3)
             reshaped_feature_batch = np.vstack(reshaped_feature_array_batch_list)
             reshaped_feature_arrays.append(reshaped_feature_batch)
@@ -121,7 +114,7 @@ class BaseMultipleF0EstimationModel:
             label_feature_tensors = [torch.from_numpy(arr).float().to(self._device) for arr in label_features]
             optimizer.zero_grad()
             with torch.cuda.amp.autocast():
-                model_output: dict[LabelFeature, torch.Tensor] = self.model(*input_feature_tensors)
+                model_output: dict[LabelFeature, torch.Tensor] = self.model(input_feature_tensors)
                 loss = torch.sum(
                     torch.stack([get_train_loss_function(feature)(model_output[feature], label_feature_tensors[idx]) for idx, (feature, output) in enumerate(model_output.items())])
                 )
@@ -133,19 +126,24 @@ class BaseMultipleF0EstimationModel:
             batch_count += 1
             logger.info(f"Batch {batch_count}: average loss={total_loss / batch_count}, last loss={last_loss}")
 
-    def validate_on_feature_iterable(self, validation_iterator: Iterator[tuple[list[FloatArray], list[FloatArray]]], expected_iter_length: int | None = None) -> float:
+    def validate_on_feature_iterable(
+        self, validation_iterator: Iterator[tuple[list[FloatArray], list[FloatArray]]], expected_iter_length: int | None = None
+    ) -> tuple[float, dict[EvaluationMetrics, float]]:
         total_loss: float = 0
         batch_count = 0
         self.model.eval()
+        evaluation_metric_aggregates: dict[EvaluationMetrics, list[float]] = defaultdict(list)
         with torch.no_grad():
             for input_features, label_features in tqdm(validation_iterator, desc="Validation", total=expected_iter_length):
                 input_feature_tensors = [torch.from_numpy(arr).float().to(self._device) for arr in input_features]
                 label_feature_tensors = [torch.from_numpy(arr).float().to(self._device) for arr in label_features]
-                model_output = self.model(*input_feature_tensors)
+                model_output = self.model(input_feature_tensors)
                 loss = torch.sum(
                     torch.stack([get_eval_loss_function(feature)(model_output[feature], label_feature_tensors[idx]) for idx, (feature, output) in enumerate(model_output.items())])
                 )
                 evaluation_metrics = get_evaluation_metrics_for_model_outputs(model_output, label_feature_tensors)
+                for metric, val in evaluation_metrics.items():
+                    evaluation_metric_aggregates[metric].append(val)
                 evaluation_metrics_strings = [f"{metric.value}={val}" for metric, val in evaluation_metrics.items()]
                 last_loss: float = loss.item()
                 total_loss += last_loss
@@ -153,8 +151,13 @@ class BaseMultipleF0EstimationModel:
                 logger.info(f"Average loss={total_loss / batch_count}, last loss={last_loss}, {', '.join(evaluation_metrics_strings)}")
         if batch_count == 0:
             logger.warning("Empty validation iterator encountered")
-            return math.inf
-        return total_loss / batch_count
+            average_loss = math.inf
+        else:
+            average_loss = total_loss / batch_count
+        evaluation_metric_averages: dict[EvaluationMetrics, float] = {metric: float(np.mean(aggregate_list)) for metric, aggregate_list in evaluation_metric_aggregates.items()}
+        evaluation_metrics_averages_strings = [f"{metric.value}={val}" for metric, val in evaluation_metric_averages.items()]
+        logger.info(f"Metric average values: loss={average_loss}, {', '.join(evaluation_metrics_averages_strings)}")
+        return average_loss, evaluation_metric_averages
 
     def save(self, name: str) -> None:
         torch.save(self.model.state_dict(), get_models_path(self._settings).joinpath(f"{name}.pth").absolute().as_posix())

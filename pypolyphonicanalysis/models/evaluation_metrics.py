@@ -1,3 +1,4 @@
+import math
 from enum import Enum
 from typing import Callable
 
@@ -8,15 +9,55 @@ from pypolyphonicanalysis.datamodel.features.features import LabelFeature, Featu
 
 class EvaluationMetrics(Enum):
     SOFT_BINARY_ACCURACY = "soft_binary_accuracy"
+    PRECISION = "precision"
+    RECALL = "recall"
+    F1 = "f1"
 
 
 def soft_binary_accuracy(prediction: torch.Tensor, label: torch.Tensor) -> float:
     return float(torch.mean(((torch.round(label) == torch.round(prediction)).float())).item())
 
 
-evaluation_metric_calculation_functions: dict[EvaluationMetrics, Callable[[torch.Tensor, torch.Tensor], float]] = {EvaluationMetrics.SOFT_BINARY_ACCURACY: soft_binary_accuracy}
+def precision(prediction: torch.Tensor, label: torch.Tensor) -> float:
+    rounded_pred = torch.round(prediction)
+    all_positives_tensor: torch.Tensor = rounded_pred == 1.0
+    all_positives = float(torch.sum(all_positives_tensor.float()).item())
+    true_positives = float(torch.sum(torch.round(label) * rounded_pred).item())
+    if all_positives == 0:
+        return math.inf
+    return true_positives / all_positives
 
-metrics_calculatable_for_feature: dict[LabelFeature, list[EvaluationMetrics]] = {Features.SALIENCE_MAP: [EvaluationMetrics.SOFT_BINARY_ACCURACY]}
+
+def recall(prediction: torch.Tensor, label: torch.Tensor) -> float:
+    rounded_pred = torch.round(prediction)
+    true_positives = float(torch.sum(torch.round(label) * rounded_pred).item())
+    negatives_on_label: torch.Tensor = torch.round(label) == 0
+    negatives_on_pred: torch.Tensor = rounded_pred == 0
+    true_negatives = float(torch.sum(negatives_on_pred.float() * negatives_on_label.float()).item())
+    false_negatives = true_negatives - float(torch.sum(negatives_on_pred.float()))
+    reciprocal = true_positives + false_negatives
+    if reciprocal == 0:
+        return math.inf
+    return true_positives / reciprocal
+
+
+def f1(prediction: torch.Tensor, label: torch.Tensor) -> float:
+    reciprocal = (1 / precision(prediction, label)) + (1 / recall(prediction, label))
+    if reciprocal == 0:
+        return math.inf
+    return 2 / reciprocal
+
+
+evaluation_metric_calculation_functions: dict[EvaluationMetrics, Callable[[torch.Tensor, torch.Tensor], float]] = {
+    EvaluationMetrics.SOFT_BINARY_ACCURACY: soft_binary_accuracy,
+    EvaluationMetrics.PRECISION: precision,
+    EvaluationMetrics.RECALL: recall,
+    EvaluationMetrics.F1: f1,
+}
+
+metrics_calculatable_for_feature: dict[LabelFeature, list[EvaluationMetrics]] = {
+    Features.SALIENCE_MAP: [EvaluationMetrics.SOFT_BINARY_ACCURACY, EvaluationMetrics.PRECISION, EvaluationMetrics.RECALL, EvaluationMetrics.F1]
+}
 
 
 def get_evaluation_metrics_for_feature_tensor(feature: LabelFeature, tensor: torch.Tensor, label: torch.Tensor) -> dict[EvaluationMetrics, float]:

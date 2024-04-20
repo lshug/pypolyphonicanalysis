@@ -2,12 +2,12 @@ import abc
 from abc import abstractmethod
 
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
+from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType
 from pypolyphonicanalysis.datamodel.tracks.sum_track import (
     SumTrack,
     load_sum_track,
     sum_track_is_saved,
 )
-from pypolyphonicanalysis.datamodel.tracks.track import track_is_saved
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
 
@@ -33,9 +33,6 @@ class BaseSummingStrategy(abc.ABC):
         if sum_track_is_saved(sum_name, self._settings):
             return load_sum_track(sum_name, self._settings)
         else:
-            for track in multitrack:
-                if not track_is_saved(track.name, self._settings) and self._settings.save_raw_training_data:
-                    track.save()
             sum_audio_array, multitrack = self._get_sum(multitrack)
             sum_track = SumTrack(sum_name, sum_audio_array, multitrack, self._settings)
             return sum_track
@@ -43,3 +40,7 @@ class BaseSummingStrategy(abc.ABC):
     @abstractmethod
     def is_summable(self, multitrack: Multitrack) -> bool:
         """Returns a boolean value indicating whether the strategy is able to sum the given multitrack."""
+
+    @property
+    def split_override(self) -> SumTrackSplitType | None:
+        return None

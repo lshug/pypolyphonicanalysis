@@ -3,7 +3,7 @@ from typing import Iterable, TypeVar
 
 from tqdm import tqdm
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.splits import SumTrackSplitType, TrainTestValidationSplit
+from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType, TrainTestValidationSplit
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
@@ -23,9 +23,8 @@ class SummingModes(Enum):
 T = TypeVar("T")
 
 
-def partition_list(list_to_partition: list[T], n: int) -> Iterable[list[T]]:
-    for idx in range(0, n):
-        yield list_to_partition[idx::n]
+def partition_list(list_to_partition: list[T], n: int) -> list[list[T]]:
+    return [list_to_partition[idx::n] for idx in range(n)]
 
 
 def generate_random_split(settings: Settings) -> SumTrackSplitType:
@@ -51,6 +50,24 @@ def get_multitrack_generator_from_dataloader_partition(
             dataloader_iters.remove((loader, summing_strategies))
 
 
+def process_sum_track(sum_track: SumTrack, sum_track_processors: list[BaseSumTrackProcessor] | None, settings: Settings) -> SumTrack:
+    feature_store = get_feature_store(settings)
+    if sum_track_processors is not None:
+        expected_name = sum_track.name
+        for processor in sum_track_processors:
+            expected_name = processor.get_sum_track_name_from_base_sumtrack_name(expected_name)
+        if sum_track_is_saved(expected_name, settings):
+            sum_track = load_sum_track(expected_name, settings)
+        else:
+            for processor in sum_track_processors:
+                sum_track = processor.process_or_load(sum_track)
+    if settings.save_raw_training_data:
+        sum_track.save()
+    for feature in settings.sum_track_provider_features_to_generate_early:
+        feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
+    return sum_track
+
+
 def process_multitrack_with_summing_strategies(
     multitrack: Multitrack,
     summing_strategies: list[BaseSummingStrategy],
@@ -60,8 +77,8 @@ def process_multitrack_with_summing_strategies(
     summing_mode: SummingModes,
     settings: Settings,
 ) -> list[tuple[SumTrack, SumTrackSplitType]]:
+    multitrack_split = generate_random_split(settings)
     rng = get_random_number_generator(settings)
-    feature_store = get_feature_store(settings)
     augmented_multitracks: list[Multitrack] = []
     sum_tracks_with_splits: list[tuple[SumTrack, SumTrackSplitType]] = []
     if pitch_shift_probabilities is None:
@@ -73,16 +90,13 @@ def process_multitrack_with_summing_strategies(
                 augmented_multitracks.append(multitrack.pitch_shift(shift + displacement))
     for multitrack in augmented_multitracks:
         if summing_mode == SummingModes.RANDOM:
-            sum_tracks = [rng.choice(summing_strategies).sum_or_retrieve(multitrack)]
+            summing_strategy = rng.choice(summing_strategies)
+            sum_tracks_with_split_preferences = [(summing_strategy.sum_or_retrieve(multitrack), summing_strategy.split_override)]
         else:
-            sum_tracks = [summing_strategy.sum_or_retrieve(multitrack) for summing_strategy in summing_strategies]
-        for sum_track in sum_tracks:
-            if sum_track_processors is not None:
-                for processor in sum_track_processors:
-                    sum_track = processor.process(sum_track)
-            for feature in settings.sum_track_provider_features_to_generate_early:
-                feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
-            sum_tracks_with_splits.append((sum_track, generate_random_split(settings)))
+            sum_tracks_with_split_preferences = [(summing_strategy.sum_or_retrieve(multitrack), summing_strategy.split_override) for summing_strategy in summing_strategies]
+        for sum_track, split_preference in sum_tracks_with_split_preferences:
+            sum_track = process_sum_track(sum_track, sum_track_processors, settings)
+            sum_tracks_with_splits.append((sum_track, multitrack_split if split_preference is None else split_preference))
     return sum_tracks_with_splits
 
 
@@ -128,7 +142,7 @@ class SumTrackProvider:
 
     def _get_sum_tracks_from_dataloaders(self) -> SumTrackWithSplitIterable:
         assert self._dataloaders_and_summing_strategies is not None
-        dataloader_partitions = list(partition_list(self._dataloaders_and_summing_strategies, self._settings.sum_track_provider_number_of_dataloader_partition_jobs))
+        dataloader_partitions = partition_list(self._dataloaders_and_summing_strategies, self._settings.sum_track_provider_number_of_dataloader_partition_jobs)
         multitrack_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_dataloader_partition_jobs, return_as="generator", verbose=5)(
             delayed(get_multitracks_from_dataloader_partition)(partition, self._settings) for partition in dataloader_partitions
         )

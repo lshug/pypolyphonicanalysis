@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 
-from pypolyphonicanalysis.datamodel.data_multiplexing.splits import SumTrackSplitType
-from pypolyphonicanalysis.datamodel.data_multiplexing.sum_track_provider import SumTrackProvider
+from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType
+from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.features.features import Features
 from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import (
     BaseMultipleF0EstimationModel,
