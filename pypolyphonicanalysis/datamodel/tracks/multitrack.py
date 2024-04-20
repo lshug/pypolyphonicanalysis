@@ -7,10 +7,18 @@ from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay
 
 class Multitrack:
     def __init__(self, tracks: Iterable[Track]) -> None:
-        self._tracks = tuple(tracks)
-        self._untrimmed_tracks: tuple[Track, ...] = tuple()
-        if len(self._tracks) > 0:
-            self._trim_tracks()
+        self._trimmed_tracks: tuple[Track, ...] | None = None
+        self._untrimmed_tracks: tuple[Track, ...] = tuple(tracks)
+
+    @property
+    def _tracks(self) -> tuple[Track, ...]:
+        if self._trimmed_tracks is None:
+            if len(self._untrimmed_tracks) > 0:
+                self._trimmed_tracks = self._trim_tracks()
+            else:
+                self._trimmed_tracks = tuple()
+            self._untrimmed_tracks = tuple(track for track in self._untrimmed_tracks if track not in self._trimmed_tracks)
+        return self._trimmed_tracks
 
     def save(self) -> None:
         for track in self._tracks:
@@ -19,15 +27,10 @@ class Multitrack:
             if track.settings.save_multitrack_tracks_pre_trimming:
                 track.save()
 
-    def _trim_tracks(self) -> None:
-        min_frames = min(track.n_frames for track in self._tracks)
-        tracks = tuple([track.trim_to_frames(min_frames) for track in self._tracks])
-        untrimmed_tracks: list[Track] = []
-        for track in self._tracks:
-            if track not in tracks:
-                untrimmed_tracks.append(track)
-        self._tracks = tracks
-        self._untrimmed_tracks = tuple(untrimmed_tracks)
+    def _trim_tracks(self) -> tuple[Track, ...]:
+        min_frames = min(track.n_frames for track in self._untrimmed_tracks)
+        tracks = tuple([track.trim_to_frames(min_frames) for track in self._untrimmed_tracks])
+        return tracks
 
     def pitch_shift(self, n_steps: float) -> "Multitrack":
         return Multitrack([track.pitch_shift(n_steps) for track in self._tracks])
@@ -37,7 +40,7 @@ class Multitrack:
         return Multitrack([track.time_shift(delay) for track in self._tracks])
 
     def __repr__(self) -> str:
-        return f"Multitrack([{','.join(track.name for track in self._tracks)}])"
+        return f"Multitrack([{','.join(track.name for track in self._untrimmed_tracks)}])"
 
     def __contains__(self, item: Track) -> bool:
         return item in self._tracks

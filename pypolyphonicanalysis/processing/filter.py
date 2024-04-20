@@ -1,7 +1,7 @@
 from audiomentations import Compose, PeakingFilter, BandPassFilter, BandStopFilter, HighPassFilter, HighShelfFilter, LowPassFilter, LowShelfFilter
 
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
-from pypolyphonicanalysis.processing.sum_track.base_sum_track_processor import BaseSumTrackProcessor
+from pypolyphonicanalysis.processing.base_sum_track_processor import BaseSumTrackProcessor
 from pypolyphonicanalysis.settings import Settings
 
 

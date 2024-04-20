@@ -1,7 +1,7 @@
 from audiomentations import Compose, Aliasing, BitCrush, ClippingDistortion, TanhDistortion
 
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
-from pypolyphonicanalysis.processing.sum_track.base_sum_track_processor import BaseSumTrackProcessor
+from pypolyphonicanalysis.processing.base_sum_track_processor import BaseSumTrackProcessor
 from pypolyphonicanalysis.settings import Settings
 
 
@@ -14,8 +14,8 @@ class Distort(BaseSumTrackProcessor):
             [
                 Aliasing(p=aliasing_cond_p),
                 BitCrush(p=bitcrush_cond_p),
-                ClippingDistortion(clipping_cond_p),
-                TanhDistortion(tanh_cond_p),
+                ClippingDistortion(p=clipping_cond_p),
+                TanhDistortion(p=tanh_cond_p),
             ],
             p=p,
             shuffle=True,
