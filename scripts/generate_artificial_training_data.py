@@ -1,3 +1,4 @@
+import logging
 import os
 import random
 from pathlib import Path
@@ -13,10 +14,13 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
 from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum, RelativePositionRange
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
-from pypolyphonicanalysis.utils.utils import save_train_test_validation_split, get_train_test_validation_split
+from pypolyphonicanalysis.utils.utils import save_train_test_validation_split, get_train_test_validation_split, check_output_path
 
 settings = Settings()
 shuffle = True
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 monophonic_tracks_source_path = Path(settings.data_directory_path).joinpath("corpora").joinpath("monophonic_collections").joinpath("SingingVoiceDataset").joinpath("monophonic")
 monophonic_tracks: dict[Path, Path | None] = {
@@ -53,7 +57,7 @@ sum_track_provider = SumTrackProvider(settings, dataloaders_and_summing_strategi
 split_dict: dict[SumTrackSplitType, list[str]] = {SumTrackSplitType.TRAIN: [], SumTrackSplitType.TEST: [], SumTrackSplitType.VALIDATION: []}
 
 training_metadata = Path(settings.data_directory_path).joinpath("training_metadata")
-training_metadata.mkdir(parents=True, exist_ok=True)
+check_output_path(training_metadata)
 count = 0
 for sum_track, split in sum_track_provider.get_sum_tracks():
     split_dict[split].append(sum_track.name)

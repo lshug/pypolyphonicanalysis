@@ -15,15 +15,15 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.models.evaluation_metrics import get_evaluation_metrics_for_model_outputs, EvaluationMetrics
 from pypolyphonicanalysis.models.losses import get_train_loss_function, get_eval_loss_function
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.utils import FloatArray
+from pypolyphonicanalysis.utils.utils import FloatArray, check_output_path
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
 logger = logging.getLogger(__name__)
 
 
 def get_models_path(settings: Settings) -> Path:
-    models_path = Path(settings.data_directory_path).joinpath("models")
-    models_path.mkdir(parents=True, exist_ok=True)
+    models_path = Path(settings.data_directory_path).joinpath("../../../data/models")
+    check_output_path(models_path)
     return models_path
 
 

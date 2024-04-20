@@ -56,4 +56,6 @@ class Settings(BaseSettings):
     peak_finding_minimum_cent_distance: PositiveFloat = 50
     squeeze_harmonic_intervals_into_one_octave: bool = True
     clustering_distance_threshold: PositiveFloat = 30
+    amplitude_smoothing_filter_length: PositiveInt = 11
     save_ground_truth_track_data: bool = True
+    use_activation_cache: bool = True

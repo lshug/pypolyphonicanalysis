@@ -9,7 +9,7 @@ from collections import defaultdict
 import shutil
 
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.conservatoire_corpus_utils import (
+from scripts.conservatoire_corpus_tools.conservatoire_corpus_utils import (
     extract_cd_item_track_from_cipher,
     remove_leading_zeros,
     load_raw_catalog_data,

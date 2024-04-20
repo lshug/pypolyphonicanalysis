@@ -8,8 +8,8 @@ from pypolyphonicanalysis.datamodel.tracks.track import Track
 class ESMUCSongData(NamedTuple):
     number_of_takes: int
     sopranos: int
-    tenors: int
     altos: int
+    tenors: int
     basses: int
 
 

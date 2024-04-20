@@ -1,8 +1,8 @@
 from torch import nn
 
 from pypolyphonicanalysis.datamodel.features.features import InputFeature, LabelFeature, Features
-from pypolyphonicanalysis.models.base_feature_to_salience_map_nn_module import BaseFeatureToSalienceMapNNModule
-from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import BaseMultipleF0EstimationModel
+from pypolyphonicanalysis.models.multiple_f0_estimation.base_feature_to_salience_map_nn_module import BaseFeatureToSalienceMapNNModule
+from pypolyphonicanalysis.models.multiple_f0_estimation.base_multiple_f0_estimation_model import BaseMultipleF0EstimationModel
 from pypolyphonicanalysis.models.model_utils import Conv
 
 

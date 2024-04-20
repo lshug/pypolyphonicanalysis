@@ -1,4 +1,5 @@
 import hashlib
+import logging
 import os
 from functools import cache
 from pathlib import Path
@@ -14,7 +15,9 @@ from pypolyphonicanalysis.datamodel.features.feature_generators import (
 from pypolyphonicanalysis.datamodel.features.features import Features, InputFeature
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.utils import FloatArray
+from pypolyphonicanalysis.utils.utils import FloatArray, check_output_path
+
+logger = logging.getLogger(__name__)
 
 
 def get_features_path(settings: Settings) -> Path:
@@ -76,7 +79,9 @@ class FeatureStore:
 
     def generate_or_load_feature_for_sum_track(self, sum_track: SumTrack, feature: Features) -> FloatArray:
         if feature_is_generated_for_sum_track(sum_track, feature, self._settings):
+            logger.debug(f"Loading saved feature {feature} for {sum_track}")
             return load_feature_for_sum_track(sum_track, feature, self._settings)
+        logger.debug(f"Generating feature {feature} for {sum_track}")
         return self._generate_feature_for_sum_track(sum_track, feature)
 
     def generate_all_features_for_sum_track(self, sum_track: SumTrack) -> None:
@@ -114,18 +119,18 @@ class FeatureStore:
 
     def _save_array_for_sum_track(self, array: FloatArray, sum_track: SumTrack, feature: Features) -> None:
         features_path = get_features_path(self._settings)
-        features_path.mkdir(parents=True, exist_ok=True)
+        check_output_path(features_path)
         sum_track_features_path = features_path.joinpath(sum_track.name)
-        sum_track_features_path.mkdir(parents=True, exist_ok=True)
+        check_output_path(sum_track_features_path)
         np.save(sum_track_features_path.joinpath(f"{feature.name}.npy"), array)
         with open(sum_track_features_path.joinpath(f"{feature.name}.saved"), "a"):
             os.utime(sum_track_features_path.joinpath(f"{feature.name}.saved"), None)
 
     def _save_array_for_file(self, array: FloatArray, file: Path, feature: Features) -> None:
         features_path = get_features_path(self._settings)
-        features_path.mkdir(parents=True, exist_ok=True)
+        check_output_path(features_path)
         file_features_path = features_path.joinpath(f"file_{hashlib.file_digest(open(file, 'rb'), 'md5')}")
-        file_features_path.mkdir(parents=True, exist_ok=True)
+        check_output_path(file_features_path)
         np.save(file_features_path.joinpath(f"{feature.name}.npy"), array)
         with open(file_features_path.joinpath(f"{feature.name}.saved"), "a"):
             os.utime(file_features_path.joinpath(f"{feature.name}.saved"), None)

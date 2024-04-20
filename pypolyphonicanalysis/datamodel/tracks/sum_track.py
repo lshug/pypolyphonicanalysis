@@ -9,12 +9,12 @@ from scipy.io import wavfile
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
 from pypolyphonicanalysis.datamodel.tracks.track import load_track
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.utils import FloatArray
+from pypolyphonicanalysis.utils.utils import FloatArray, check_output_path
 
 
 def get_sum_tracks_path(settings: Settings) -> Path:
     sum_tracks_path = Path(os.path.join(settings.data_directory_path, "sum_tracks"))
-    sum_tracks_path.mkdir(parents=True, exist_ok=True)
+    check_output_path(sum_tracks_path)
     return sum_tracks_path
 
 
@@ -88,7 +88,7 @@ class SumTrack:
     def save(self) -> None:
         sum_tracks_path = get_sum_tracks_path(self._settings)
         sum_track_path = sum_tracks_path.joinpath(self.name)
-        sum_track_path.mkdir(parents=True, exist_ok=True)
+        check_output_path(sum_tracks_path)
         self._source_multitrack.save()
         source_path: str
         match self._audio_source:

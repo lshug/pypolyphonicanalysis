@@ -3,7 +3,6 @@ import itertools
 import json
 import os
 import random
-from collections import defaultdict
 from functools import cache
 from pathlib import Path
 from typing import cast
@@ -97,6 +96,7 @@ def get_estimated_times_and_frequencies_from_salience_map(
     settings: Settings,
     remove_negatives: bool = False,
 ) -> F0TimesAndFrequencies:
+    # Adapted from pitch_activations_to_mf0 from DeepSalience
     n_time_frames = pitch_activation_mat.shape[1]
     freq_grid = librosa.cqt_frequencies(
         n_bins=settings.n_octaves * 12 * settings.over_sample,
@@ -124,23 +124,20 @@ def get_estimated_times_and_frequencies_from_salience_map(
     return time_grid, freqs
 
 
-def get_voice_times_and_f0s_from_csv(filename: str) -> dict[int, dict[float, float]]:
-    voices: dict[int, dict[float, float]] = defaultdict(dict)
-    times: list[float] = []
-    with open(filename) as fhandle:
-        csv_reader = csv.reader(fhandle, delimiter="\t")
-        for row in csv_reader:
-            time = float(row[0])
-            times.append(time)
-            for idx, freqstr in enumerate(row[1:]):
-                voices[idx][time] = float(freqstr)
-    for voice in voices.keys():
-        for time in times:
-            voices[voice].setdefault(time, 0)
-    return voices
+def save_f0_trajectories_csv(path: Path, times: list[float], freqs: FloatArray) -> None:
+    with open(path, "w") as f:
+        csv_writer = csv.writer(f, delimiter="\t")
+        time: float
+        frequencies: FloatArray
+        for time, frequencies in zip(times, freqs):
+            row = [time]
+            row.extend([x for x in frequencies if x > 0])
+            csv_writer.writerow(row)
 
 
 def sonify_trajectory_with_sinusoid(traj: FloatArray, sr: int = 44100, amplitude: float = 0.3, smooth_len: int = 11) -> FloatArray:
+    # Taken from:
+    # https://www.audiolabs-erlangen.de/resources/MIR/FMP/C8/C8S2_FundFreqTracking.html
     audio_len = int(traj[-1][0] * sr)
     if traj.shape[1] < 3:
         confidence = np.zeros(traj.shape[0]).astype(np.float32)
@@ -173,23 +170,13 @@ def sonify_trajectory_with_sinusoid(traj: FloatArray, sr: int = 44100, amplitude
     return x_soni
 
 
-def save_f0_trajectories_csv(path: Path, times: list[float], freqs: FloatArray) -> None:
-    with open(path, "w") as f:
-        csv_writer = csv.writer(f, delimiter="\t")
-        time: float
-        frequencies: FloatArray
-        for time, frequencies in zip(times, freqs):
-            row = [time]
-            row.extend([x for x in frequencies if x > 0])
-            csv_writer.writerow(row)
-
-
 def plot_predictions(
     times: FloatArray,
     freqs: FloatArray,
     name: str,
     output_path: Path,
     figsize: tuple[int, int],
+    correction_values: FloatArray | None = None,
 ) -> None:
     check_output_path(output_path)
     plt.figure(figsize=figsize)
@@ -204,6 +191,8 @@ def plot_predictions(
         voice_freqs = voice_freqs[valid_idxs]
         cents = 1200 * np.log2(voice_freqs / librosa.note_to_hz("A1"))
         plt.plot(times[valid_idxs], cents, next(color_cycle), label=f"Voice {idx}")
+    if correction_values is not None:
+        plt.plot(times, 1200 * np.log2(np.mean(freqs[freqs > 0]) / librosa.note_to_hz("A1")) + correction_values, "-k", label="Est. pitch drift")
     plt.legend()
     plt.savefig(os.path.join(output_path, f"{name}.jpg"))
     plt.close()
@@ -226,6 +215,7 @@ def save_reconstructed_audio(
             np.array(list(zip(est_times, voice_freqs))),
             sr=settings.sr,
             amplitude=1 / number_of_voices,
+            smooth_len=settings.amplitude_smoothing_filter_length,
         )
         voice_path = os.path.join(output_path, f"{name}_reconstruction_voice{idx}.wav")
         scipy.io.wavfile.write(voice_path, settings.sr, voice_audio)
@@ -233,13 +223,6 @@ def save_reconstructed_audio(
     joint_path = os.path.join(output_path, f"{name}_reconstruction_allvoices.wav")
     joint_audio = sum(voice_audios)
     scipy.io.wavfile.write(joint_path, settings.sr, joint_audio)
-
-
-def convert_times_and_freqs_arrays_to_lists(
-    est_times: FloatArray,
-    est_freqs: list[FloatArray],
-) -> tuple[list[float], list[list[float]]]:
-    return est_times.tolist(), [arr.tolist() for arr in est_freqs]
 
 
 def sum_wave_arrays(input_arrays: list[FloatArray]) -> FloatArray:
