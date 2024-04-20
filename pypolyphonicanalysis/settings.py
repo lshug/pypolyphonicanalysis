@@ -11,9 +11,9 @@ class Settings(BaseSettings):
     data_directory_path: str = Field(default="./data")
     random_seed: int = Field(default=123)
 
-    # Tracks, feature generation, sum track provider
+    # Tracks, feature generation, sum track provider, data mux
     test_validation_size: PositiveFloat = Field(default=0.2, le=1.0)
-    validation_proportion: PositiveFloat = Field(default=0.5, le=1.0)
+    validation_proportion: PositiveFloat = Field(default=1.0, le=1.0)
     save_raw_training_data: bool = True
     save_multitrack_tracks_pre_trimming: bool = True
     save_training_features: bool = True
@@ -22,8 +22,6 @@ class Settings(BaseSettings):
     sum_track_provider_number_of_dataloader_partition_jobs: PositiveInt = 10
     sum_track_provider_number_of_multitrack_processing_jobs_per_dataloader_partition: PositiveInt = 10
     sum_track_provider_features_to_generate_early: frozenset[Features] = Field(default=frozenset({Features.HCQT_MAG, Features.HCQT_PHASE_DIFF, Features.HCQT_PHASE_DIFF}))
-
-    # Data mux
     training_mux_number_of_active_streams: PositiveInt = 100
     training_mux_number_of_samples_per_sum_track: PositiveInt = 10
 

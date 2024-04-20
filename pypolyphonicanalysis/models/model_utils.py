@@ -51,3 +51,81 @@ class ResidualCNNBlockModule(nn.Module):
             if idx != 0 or self._residual_connection_on_first_block:
                 out += inp
         return out
+
+
+# UNet primitives and module adapted from:
+# https://github.com/milesial/Pytorch-UNet/tree/master
+
+
+class DoubleConv(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, depthwise: bool) -> None:
+        super().__init__()
+        self._double_conv = nn.Sequential(
+            Conv(in_channels, out_channels, 3, depthwise, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+            Conv(out_channels, out_channels, 3, depthwise, padding=1, bias=False),
+            nn.BatchNorm2d(out_channels),
+            nn.ReLU(inplace=True),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        double_conv_out: torch.Tensor = self._double_conv(x)
+        return double_conv_out
+
+
+class Down(nn.Module):
+
+    def __init__(self, in_channels: int, out_channels: int, depthwise: bool) -> None:
+        super().__init__()
+        self._maxpool_conv = nn.Sequential(nn.MaxPool2d(2), DoubleConv(in_channels, out_channels, depthwise))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        maxpool_conv_out: torch.Tensor = self._maxpool_conv(x)
+        return maxpool_conv_out
+
+
+class Up(nn.Module):
+
+    def __init__(self, in_channels: int, out_channels: int, depthwise: bool) -> None:
+        super().__init__()
+        self._up = nn.ConvTranspose2d(in_channels, in_channels // 2, kernel_size=2, stride=2)
+        self._conv = DoubleConv(in_channels, out_channels, depthwise)
+
+    def forward(self, x1: torch.Tensor, x2: torch.Tensor) -> torch.Tensor:
+        x1 = self._up(x1)
+        diffY = x2.size()[2] - x1.size()[2]
+        diffX = x2.size()[3] - x1.size()[3]
+
+        x1 = nn.functional.pad(x1, [diffX // 2, diffX - diffX // 2, diffY // 2, diffY - diffY // 2])
+        x = torch.cat([x2, x1], dim=1)
+        conv_out: torch.Tensor = self._conv(x)
+        return conv_out
+
+
+class UNet(nn.Module):
+    def __init__(self, in_channels: int, out_channels: int, depthwise: bool) -> None:
+        super(UNet, self).__init__()
+        self._inc = DoubleConv(in_channels, 64, depthwise)
+        self._down1 = Down(64, 128, depthwise)
+        self._down2 = Down(128, 256, depthwise)
+        self._down3 = Down(256, 512, depthwise)
+        self._down4 = Down(512, 1024, depthwise)
+        self._up1 = Up(1024, 512, depthwise)
+        self._up2 = Up(512, 256, depthwise)
+        self._up3 = Up(256, 128, depthwise)
+        self._up4 = Up(128, 64, depthwise)
+        self._out = Conv(64, out_channels, 1, depthwise)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        x1 = self._inc(x)
+        x2 = self._down1(x1)
+        x3 = self._down2(x2)
+        x4 = self._down3(x3)
+        x5 = self._down4(x4)
+        x = self._up1(x5, x4)
+        x = self._up2(x, x3)
+        x = self._up3(x, x2)
+        x = self._up4(x, x1)
+        logits: torch.Tensor = self._out(x)
+        return logits
