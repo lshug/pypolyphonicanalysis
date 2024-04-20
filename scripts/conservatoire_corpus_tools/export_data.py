@@ -3,7 +3,7 @@ from collections import defaultdict
 from pydub import AudioSegment
 
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.conservatoire_corpus_utils import (
+from scripts.conservatoire_corpus_tools.conservatoire_corpus_utils import (
     load_raw_catalog_data,
     extract_cd_item_track_from_cipher,
     CatalogEntry,

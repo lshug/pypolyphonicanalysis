@@ -36,6 +36,9 @@ class Multitrack:
         delay = median_group_delay(ir, settings.sr)
         return Multitrack([track.time_shift(delay) for track in self._tracks])
 
+    def __repr__(self) -> str:
+        return f"Multitrack([{','.join(track.name for track in self._tracks)}])"
+
     def __contains__(self, item: Track) -> bool:
         return item in self._tracks
 

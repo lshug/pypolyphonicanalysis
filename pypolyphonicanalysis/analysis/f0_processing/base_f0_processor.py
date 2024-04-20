@@ -1,12 +1,13 @@
 import abc
 from abc import abstractmethod
 
+from pypolyphonicanalysis.analysis.recording import Recording
 from pypolyphonicanalysis.utils.utils import FloatArray, F0TimesAndFrequencies
 
 
 class BaseF0Processor(abc.ABC):
     @abstractmethod
-    def process(self, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
+    def process(self, recording: Recording, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
         """
         Returns processed times and freqs.
         """

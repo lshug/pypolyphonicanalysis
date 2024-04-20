@@ -1,3 +1,4 @@
+import logging
 from enum import Enum
 from typing import Iterable, TypeVar
 
@@ -8,11 +9,13 @@ from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseData
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack, load_sum_track, sum_track_is_saved
-from pypolyphonicanalysis.processing.sum_track.base_sum_track_processor import BaseSumTrackProcessor
+from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.base_sum_track_processor import BaseSumTrackProcessor
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_random_number_generator
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 from joblib import Parallel, delayed
+
+logger = logging.getLogger(__name__)
 
 
 class SummingModes(Enum):
@@ -51,6 +54,7 @@ def get_multitrack_generator_from_dataloader_partition(
 
 
 def process_sum_track(sum_track: SumTrack, sum_track_processors: list[BaseSumTrackProcessor] | None, settings: Settings) -> SumTrack:
+    logger.debug(f"Processing sum_track {sum_track.name}")
     feature_store = get_feature_store(settings)
     if sum_track_processors is not None:
         expected_name = sum_track.name
@@ -81,6 +85,7 @@ def process_multitrack_with_summing_strategies(
     rng = get_random_number_generator(settings)
     augmented_multitracks: list[Multitrack] = []
     sum_tracks_with_splits: list[tuple[SumTrack, SumTrackSplitType]] = []
+    logger.debug(f"Augmenting multitrack {multitrack}, split {multitrack_split}")
     if pitch_shift_probabilities is None:
         augmented_multitracks.append(multitrack)
     else:
@@ -89,6 +94,7 @@ def process_multitrack_with_summing_strategies(
                 displacement = rng.uniform(pitch_shift_displacement_range[0], pitch_shift_displacement_range[1])
                 augmented_multitracks.append(multitrack.pitch_shift(shift + displacement))
     for multitrack in augmented_multitracks:
+        logger.debug(f"Processing augmented multitrack {multitrack}, split {multitrack_split}")
         if summing_mode == SummingModes.RANDOM:
             summing_strategy = rng.choice(summing_strategies)
             sum_tracks_with_split_preferences = [(summing_strategy.sum_or_retrieve(multitrack), summing_strategy.split_override)]
@@ -104,6 +110,7 @@ def get_multitracks_from_dataloader_partition(
     partition: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]],
     settings: Settings,
 ) -> list[tuple[Multitrack, list[BaseSummingStrategy]]]:
+    logger.debug(f"Processing dataloader partition {partition}")
     if len(partition) == 0:
         return []
     total = sum(len(dataloader) for dataloader, _ in partition)
@@ -161,6 +168,7 @@ class SumTrackProvider:
             )
             for sum_track_with_splits_list in tqdm(sum_track_with_splits_lists, desc="Getting SumTracks from multitracks", total=len(multitrack_list)):
                 for sum_track, split in sum_track_with_splits_list:
+                    logger.debug(f"Yielding sum_track {sum_track}, split {split}")
                     yield sum_track, split
 
     def _load_or_shallow_load_sum_track(self, sum_track_name: str) -> SumTrack:

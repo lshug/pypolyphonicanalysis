@@ -15,12 +15,12 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track import (
     load_sum_track,
 )
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.utils import get_random_state, sum_wave_arrays, FloatArray
+from pypolyphonicanalysis.utils.utils import get_random_state, sum_wave_arrays, FloatArray, check_output_path
 
 
 def get_irs_path(settings: Settings) -> Path:
     irs_path = Path(settings.data_directory_path).joinpath("irs")
-    irs_path.mkdir(parents=True, exist_ok=True)
+    check_output_path(irs_path)
     return irs_path
 
 

@@ -13,4 +13,4 @@ def get_train_loss_function(feature: LabelFeature) -> Callable[[torch.Tensor, to
 
 
 def get_eval_loss_function(feature: LabelFeature) -> Callable[[torch.Tensor, torch.Tensor], torch.Tensor]:
-    return TRAIN_LOSSES[feature]
+    return EVAL_LOSSES[feature]

@@ -1,4 +1,5 @@
 import abc
+import logging
 from abc import abstractmethod
 from pathlib import Path
 from typing import Iterable, TypeVar, Sequence, cast
@@ -8,6 +9,8 @@ from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_random_number_generator
 
 SequenceType = TypeVar("SequenceType")
+
+logger = logging.getLogger(__name__)
 
 
 class BaseDataLoader(abc.ABC):
@@ -25,6 +28,7 @@ class BaseDataLoader(abc.ABC):
 
     def get_multitracks(self) -> Iterable[Multitrack]:
         for multitrack in self._get_multitracks():
+            logger.debug(f"Yielding multitrack {multitrack} from {self}")
             yield multitrack
             self._count += 1
             if self._count > self._maxlen:

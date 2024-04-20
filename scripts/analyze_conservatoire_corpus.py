@@ -4,12 +4,15 @@ from pathlib import Path
 import librosa
 
 from pypolyphonicanalysis.analysis.analysis_runner import (
-    Recording,
     AutomaticAnalysisRunner,
 )
-from pypolyphonicanalysis.models.baseline_model import BaselineModel
-from pypolyphonicanalysis.processing.f0.frequency_range_filter import FrequencyRangeFilter
-from pypolyphonicanalysis.processing.f0.masking_filter import MaskingFilter
+from pypolyphonicanalysis.analysis.f0_processing.maximum_cent_difference_from_mean_filter import MaximumCentDifferenceFromMeanFilter
+from pypolyphonicanalysis.analysis.f0_processing.most_likely_voices_filter import MostLikelyVoicesFilter
+from pypolyphonicanalysis.analysis.pitch_drift_detrenders.log_linear_detrender import LogLinearDetrender
+from pypolyphonicanalysis.analysis.recording import Recording
+from pypolyphonicanalysis.models.multiple_f0_estimation.baseline_model import BaselineModel
+from pypolyphonicanalysis.analysis.f0_processing.frequency_range_filter import FrequencyRangeFilter
+from pypolyphonicanalysis.analysis.f0_processing.masking_filter import MaskingFilter
 from pypolyphonicanalysis.settings import Settings
 
 settings = Settings()
@@ -17,8 +20,12 @@ model = BaselineModel(settings, "model")
 
 processors = [
     FrequencyRangeFilter(float(librosa.note_to_hz("G2")), float(librosa.note_to_hz("G7"))),
+    MaximumCentDifferenceFromMeanFilter(),
     MaskingFilter(),
+    MostLikelyVoicesFilter(),
 ]
+
+detrender = LogLinearDetrender(settings)
 
 svaneti_recordings: list[Recording] = []
 for file in os.listdir("audio/svaneti"):
@@ -28,7 +35,7 @@ for file in os.listdir("audio/svaneti"):
 kakheti_recordings: list[Recording] = []
 for file in os.listdir("audio/kakheti"):
     if ".wav" in file:
-        kakheti_recordings.append(Recording(name=file.split(".")[0], file_path=Path(f"audio/kakheti/{file}")))
+        kakheti_recordings.append(Recording(name=file.split(".")[0], file_path=Path(f"audio/kakheti/{file}"), number_of_voices=3))
 
 gvm_recordings: list[Recording] = []
 gvm_exceptions = [
@@ -47,15 +54,16 @@ for file in os.listdir(os.path.join(settings.data_directory_path, "corpora", "GV
                 name=file.split(".")[0],
                 file_path=Path(os.path.join(settings.data_directory_path, "corpora", "GVM", file)),
                 ground_truth_files=None if len(ground_truth_files) == 0 else tuple(ground_truth_files),
+                number_of_voices=3,
             )
         )
 
 
-analyzer = AutomaticAnalysisRunner(Path("output/svaneti_out/"), model, processors, settings)
+analyzer = AutomaticAnalysisRunner(Path("output/svaneti_out/"), model, processors, settings, detrender)
 svaneti_results = analyzer.generate_analysis_results(svaneti_recordings)
 
-analyzer.set_output_path(Path("output/kakheti_out/"))
+analyzer = AutomaticAnalysisRunner(Path("output/kakheti_out/"), model, processors, settings, detrender)
 kakheti_results = analyzer.generate_analysis_results(kakheti_recordings)
 
-analyzer.set_output_path(Path("output/gvm_out/"))
+analyzer = AutomaticAnalysisRunner(Path("output/gvm_out/"), model, processors, settings, detrender)
 gvm_results = analyzer.generate_analysis_results(gvm_recordings)

@@ -14,13 +14,13 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
 from pypolyphonicanalysis.datamodel.summing_strategies.direct_sum import DirectSum
 from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
 from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum, RelativePositionRange
-from pypolyphonicanalysis.processing.sum_track.add_noise import AddNoise
-from pypolyphonicanalysis.processing.sum_track.base_sum_track_processor import BaseSumTrackProcessor
-from pypolyphonicanalysis.processing.sum_track.distort import Distort
-from pypolyphonicanalysis.processing.sum_track.filter import Filter
+from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.add_noise import AddNoise
+from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.base_sum_track_processor import BaseSumTrackProcessor
+from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.distort import Distort
+from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.filter import Filter
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
-from pypolyphonicanalysis.utils.utils import save_train_test_validation_split
+from pypolyphonicanalysis.utils.utils import save_train_test_validation_split, check_output_path
 
 settings = Settings()
 shuffle = True
@@ -67,7 +67,7 @@ sum_track_provider = SumTrackProvider(
 split_dict: dict[SumTrackSplitType, list[str]] = {SumTrackSplitType.TRAIN: [], SumTrackSplitType.TEST: [], SumTrackSplitType.VALIDATION: []}
 
 training_metadata = Path(settings.data_directory_path).joinpath("training_metadata")
-training_metadata.mkdir(parents=True, exist_ok=True)
+check_output_path(training_metadata)
 count = 0
 for sum_track, split in sum_track_provider.get_sum_tracks():
     split_dict[split].append(sum_track.name)

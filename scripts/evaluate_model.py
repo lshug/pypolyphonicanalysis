@@ -2,7 +2,7 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackPro
 from pypolyphonicanalysis.datamodel.evaluation.test_set_evaluator import (
     TestSetEvaluator,
 )
-from pypolyphonicanalysis.models.baseline_model import BaselineModel
+from pypolyphonicanalysis.models.multiple_f0_estimation.baseline_model import BaselineModel
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_train_test_validation_split
 

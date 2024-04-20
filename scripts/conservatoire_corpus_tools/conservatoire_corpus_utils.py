@@ -156,7 +156,7 @@ class CatalogEntry(BaseModel):
 
 
 def get_conservatoire_corpus_path(settings: Settings) -> Path:
-    return Path(settings.data_directory_path).joinpath("corpora").joinpath("conservatoire_corpus")
+    return Path(settings.data_directory_path).joinpath("../../data/corpora").joinpath("conservatoire_corpus")
 
 
 def load_raw_catalog_data(settings: Settings) -> list[RawCatalogData]:

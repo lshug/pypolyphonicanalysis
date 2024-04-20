@@ -8,7 +8,7 @@ from tqdm import tqdm
 from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType
 from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.features.features import Features
-from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import (
+from pypolyphonicanalysis.models.multiple_f0_estimation.base_multiple_f0_estimation_model import (
     BaseMultipleF0EstimationModel,
 )
 from pypolyphonicanalysis.settings import Settings
@@ -18,6 +18,7 @@ from pypolyphonicanalysis.utils.utils import (
     get_random_number_generator,
     save_reconstructed_audio,
     plot_predictions,
+    check_output_path,
 )
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
@@ -29,7 +30,7 @@ pd.set_option("display.max_colwidth", 1000)
 
 def get_evaluations_path(settings: Settings) -> Path:
     evaluations_path = Path(settings.data_directory_path).joinpath("evaluations")
-    evaluations_path.mkdir(parents=True, exist_ok=True)
+    check_output_path(evaluations_path)
     return evaluations_path
 
 
