@@ -51,7 +51,7 @@ class RoomSimulationSum(BaseSummingStrategy):
         return True
 
     def get_sum_track_name(self, multitrack: Multitrack) -> str:
-        return f"room_sim_{position_range_average(self._room_dim_range)}_{position_range_average(self._mic_position_range)}_{range_average(self._rt60_range)}_{range_average(self._max_rand_disp_range)}{'_'.join(track.name for track in multitrack)}"
+        return f"room_sim_{position_range_average(self._room_dim_range)}_{range_average(self._rt60_range)}{'_'.join(track.name for track in multitrack)}"
 
     def _get_float_from_range(self, range: Range) -> float:
         return self._rng.uniform(range[0], range[1])

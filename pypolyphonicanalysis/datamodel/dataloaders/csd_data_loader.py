@@ -35,7 +35,7 @@ class CSDDataloader(BaseDataLoader):
                             yield Multitrack((soprano, alto, tenor, bass))
 
     def _get_length(self) -> int:
-        number_of_songs = 4
+        number_of_songs = len(self.song_prefixes)
         number_of_voices = 4
         number_of_variations_per_voice = 4
         return number_of_songs * int(number_of_voices**number_of_variations_per_voice)

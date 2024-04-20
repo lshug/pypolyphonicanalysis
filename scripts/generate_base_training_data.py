@@ -27,7 +27,7 @@ settings = Settings()
 shuffle = True
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
+logging.basicConfig(level=logging.DEBUG)
 
 feature_store = get_feature_store(settings)
 

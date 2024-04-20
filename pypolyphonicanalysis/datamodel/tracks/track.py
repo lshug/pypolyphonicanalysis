@@ -135,8 +135,8 @@ class Track:
     def pitch_shift(self, n_steps: float) -> "Track":
         if n_steps == 0:
             return self
-        shift_suffix = f"pitch_shift_{n_steps}_"
-        track_name = f"{shift_suffix}{self._name}"
+        shift_prefix = f"pshift_{n_steps:.2f}_"
+        track_name = f"{shift_prefix}{self._name}"
         if track_is_saved(track_name, self._settings):
             return load_track(track_name, self._settings)
         audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, n_steps)
