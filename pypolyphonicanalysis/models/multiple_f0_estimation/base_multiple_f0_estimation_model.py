@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 def get_models_path(settings: Settings) -> Path:
-    models_path = Path(settings.data_directory_path).joinpath("../../../data/models")
+    models_path = Path(settings.data_directory_path).joinpath("models")
     check_output_path(models_path)
     return models_path
 
