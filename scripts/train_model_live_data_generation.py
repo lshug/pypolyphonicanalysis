@@ -21,7 +21,7 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
 from pypolyphonicanalysis.datamodel.summing_strategies.direct_sum import DirectSum
 from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
 from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum, RelativePositionRange
-from pypolyphonicanalysis.models.residual_model import ResidualModel
+from pypolyphonicanalysis.models.multiple_f0_estimation.residual_model import ResidualModel
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store

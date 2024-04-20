@@ -11,12 +11,12 @@ from pyrubberband import pyrb
 from scipy.io import wavfile
 
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay
+from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay, check_output_path
 
 
 def get_tracks_path(settings: Settings) -> Path:
     tracks_path = Path(os.path.join(settings.data_directory_path, "tracks"))
-    tracks_path.mkdir(parents=True, exist_ok=True)
+    check_output_path(tracks_path)
     return tracks_path
 
 
@@ -117,7 +117,7 @@ class Track:
             return
         tracks_path = get_tracks_path(self._settings)
         track_path = tracks_path.joinpath(self.name)
-        track_path.mkdir(parents=True, exist_ok=True)
+        check_output_path(track_path)
         time_freq_arr = np.stack(self.f0_trajectory_annotation).transpose()
         np.save(track_path.joinpath("f0_trajectory_annotation.npy").absolute().as_posix(), time_freq_arr)
         source_path: str

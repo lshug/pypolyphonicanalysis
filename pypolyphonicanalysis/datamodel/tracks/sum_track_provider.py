@@ -9,7 +9,7 @@ from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseData
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import BaseSummingStrategy
 from pypolyphonicanalysis.datamodel.tracks.multitrack import Multitrack
 from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack, load_sum_track, sum_track_is_saved
-from pypolyphonicanalysis.processing.sum_track.base_sum_track_processor import BaseSumTrackProcessor
+from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.base_sum_track_processor import BaseSumTrackProcessor
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_random_number_generator
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store

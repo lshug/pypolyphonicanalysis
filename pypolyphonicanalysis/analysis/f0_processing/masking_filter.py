@@ -2,7 +2,8 @@ import librosa
 import numpy as np
 import scipy
 
-from pypolyphonicanalysis.processing.f0.base_f0_processor import BaseF0Processor
+from pypolyphonicanalysis.analysis.f0_processing.base_f0_processor import BaseF0Processor
+from pypolyphonicanalysis.analysis.recording import Recording
 from pypolyphonicanalysis.utils.utils import (
     FloatArray,
     F0TimesAndFrequencies,
@@ -46,7 +47,7 @@ class MaskingFilter(BaseF0Processor):
         self._beta = beta
         self._L = L
 
-    def process(self, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
+    def process(self, recording: Recording, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
         new_freqs = masking_filter(times, freqs, self._cent_resolution, self._beta, self._L)
         valid_idxs = np.any(new_freqs > 0, 1)
         return times[valid_idxs], new_freqs[valid_idxs]

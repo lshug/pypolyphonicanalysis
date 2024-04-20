@@ -23,14 +23,16 @@ from sklearn.neighbors import KernelDensity
 from sklearn.utils.validation import check_is_fitted
 from tqdm import tqdm
 
+from pypolyphonicanalysis.analysis.pitch_drift_detrenders.base_pitch_drift_detrender import BasePitchDriftDetrender
+from pypolyphonicanalysis.analysis.recording import Recording
 from pypolyphonicanalysis.datamodel.features.features import Features
 from pypolyphonicanalysis.datamodel.tracks.track import (
     track_is_saved,
     load_track,
     Track,
 )
-from pypolyphonicanalysis.processing.f0.base_f0_processor import BaseF0Processor
-from pypolyphonicanalysis.models.base_multiple_f0_estimation_model import (
+from pypolyphonicanalysis.analysis.f0_processing.base_f0_processor import BaseF0Processor
+from pypolyphonicanalysis.models.multiple_f0_estimation.base_multiple_f0_estimation_model import (
     BaseMultipleF0EstimationModel,
 )
 from pypolyphonicanalysis.settings import Settings
@@ -42,17 +44,17 @@ from pypolyphonicanalysis.utils.utils import (
     save_reconstructed_audio,
     plot_predictions,
     get_random_state,
+    F0TimesAndFrequencies,
 )
 from textwrap import wrap
 
 logger = logging.getLogger(__name__)
 
 
-class Recording(BaseModel, frozen=True):
-    name: str
-    file_path: Path
-    metadata_json: str = "{}"
-    ground_truth_files: tuple[Path, ...] | None = None
+def get_activation_cache_path(settings: Settings) -> Path:
+    path = Path(settings.data_directory_path).joinpath("activation_cache")
+    check_output_path(path)
+    return path
 
 
 def _get_cluster_recording_idxs_from_child(node: FloatArray, children: FloatArray, number_of_labels: int) -> list[FloatArray]:
@@ -81,21 +83,17 @@ class AutomaticAnalysisRunner:
     def __init__(
         self,
         output_path: Path,
-        model: BaseMultipleF0EstimationModel,
+        multiple_f0_estimation_model: BaseMultipleF0EstimationModel,
         processors: Sequence[BaseF0Processor],
         settings: Settings,
-        activation_cache: Path | None = None,
+        detrender: BasePitchDriftDetrender | None = None,
     ) -> None:
         check_output_path(output_path)
         self._output_path = output_path
-        self._model = model
+        self._model = multiple_f0_estimation_model
         self._processors = processors
-        self._cache_activations = activation_cache
         self._settings = settings
-
-    def set_output_path(self, path: Path) -> None:
-        check_output_path(path)
-        self._output_path = path
+        self._detrender = detrender
 
     def _estimate_recording_f0s(self, recording: Recording) -> FloatArray:
         return self._model.predict_on_file(recording.file_path)[Features.SALIENCE_MAP]
@@ -106,10 +104,11 @@ class AutomaticAnalysisRunner:
         freqs: FloatArray,
         recording: Recording,
         stage: str,
+        correction_values: FloatArray | None = None,
     ) -> None:
         name_prefix = f"{recording.name}_{stage}"
         save_f0_trajectories_csv(self._output_path.joinpath(f"{name_prefix}.csv"), times.tolist(), freqs)
-        plot_predictions(times, freqs, name_prefix, self._output_path, self._settings.default_figsize)
+        plot_predictions(times, freqs, name_prefix, self._output_path, self._settings.default_figsize, correction_values)
 
     def _get_harmonic_intervals(self, freqs: FloatArray, name: str) -> FloatArray:
         cents_above_a1 = 1200 * np.log2(freqs / librosa.note_to_hz("A1"), out=-1 * np.inf * np.ones_like(freqs), where=freqs != 0)
@@ -270,57 +269,63 @@ class AutomaticAnalysisRunner:
                 track.save()
         return gmm
 
+    def _apply_processing_to_times_and_freqs(self, recording: Recording, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
+        if len(self._processors) == 0 and self._detrender is not None:
+            correction_values = self._detrender.get_correction_values(times, freqs)
+            self._save_f0s(times, freqs, recording, "initial", correction_values)
+            freqs = self._detrender.detrend(freqs, correction_values)
+            self._save_f0s(
+                times,
+                freqs,
+                recording,
+                "final_detrended",
+            )
+        elif len(self._processors) == 0:
+            self._save_f0s(times, freqs, recording, "initial")
+            self._save_f0s(times, freqs, recording, "final")
+        else:
+            self._save_f0s(times, freqs, recording, "initial")
+            for idx, processor in enumerate(self._processors):
+                times, freqs = processor.process(recording, times, freqs)
+                if idx == len(self._processors) - 1:
+                    if self._detrender is not None:
+                        correction_values = self._detrender.get_correction_values(times, freqs)
+                        self._save_f0s(times, freqs, recording, f"{processor.get_stage_name()}{'_final' if idx == len(self._processors) - 1 else ''}", correction_values)
+                        freqs = self._detrender.detrend(freqs, correction_values)
+                        self._save_f0s(times, freqs, recording, "final_detrended")
+                    else:
+                        self._save_f0s(times, freqs, recording, f"{processor.get_stage_name()}{'_final' if idx == len(self._processors) -1 else ''}")
+                else:
+                    self._save_f0s(times, freqs, recording, processor.get_stage_name())
+        return times, freqs
+
     def _analyze_recording(self, recording: Recording) -> tuple[
         tuple[FloatArray, FloatArray],
         FloatArray,
         list[tuple[float, float, float]],
     ]:
         logger.info(f"Analyzing recording {recording.name}")
-        if self._cache_activations is not None:
-            self._cache_activations.mkdir(parents=True, exist_ok=True)
-            if os.path.isfile(os.path.join(self._cache_activations, f"{recording.name}.npy")):
-                initial_f0s = np.load(os.path.join(self._cache_activations, f"{recording.name}.npy"))
+        if self._settings.use_activation_cache:
+            activation_cache_path = get_activation_cache_path(self._settings)
+            if os.path.isfile(activation_cache_path.joinpath(f"{recording.name}.npy")):
+                initial_f0s = np.load(activation_cache_path.joinpath(f"{recording.name}.npy").absolute().as_posix())
             else:
                 initial_f0s = self._estimate_recording_f0s(recording)
                 np.save(
-                    os.path.join(self._cache_activations, f"{recording.name}.npy"),
+                    activation_cache_path.joinpath(f"{recording.name}.npy").absolute().as_posix(),
                     initial_f0s,
                 )
         else:
             initial_f0s = self._estimate_recording_f0s(recording)
         times, freqs = get_estimated_times_and_frequencies_from_salience_map(initial_f0s, self._settings, True)
-        json.dump(
-            json.loads(recording.metadata_json),
-            open(
-                os.path.join(self._output_path, f"{recording.name}.json"),
-                "w",
-                encoding="utf8",
-            ),
-        )
         save_reconstructed_audio(times, freqs, recording.name, self._output_path, self._settings)
-        self._save_f0s(times, freqs, recording, "initial")
-        for processor in self._processors:
-            times, freqs = processor.process(times, freqs)
-            self._save_f0s(times, freqs, recording, processor.get_stage_name())
-        self._save_f0s(times, freqs, recording, "final")
+        times, freqs = self._apply_processing_to_times_and_freqs(recording, times, freqs)
+
         harmonic_intervals = self._get_harmonic_intervals(freqs, recording.name)
         gmm, kde, gaussian_mixture_weights_means_variances = self._model_harmonic_interval_distribution(harmonic_intervals, recording.name)
-        self._export_harmonic_interval_distribution_plots_and_files(
-            harmonic_intervals,
-            kde,
-            gmm,
-            self._get_ground_truth_gmm(recording),
-            recording.name,
-        )
-        self._generate_gmm_derived_scale_example_file(
-            [mean for _, mean, _ in gaussian_mixture_weights_means_variances],
-            recording.name,
-        )
-        return (
-            (times, freqs),
-            harmonic_intervals,
-            gaussian_mixture_weights_means_variances,
-        )
+        self._export_harmonic_interval_distribution_plots_and_files(harmonic_intervals, kde, gmm, self._get_ground_truth_gmm(recording), recording.name)
+        self._generate_gmm_derived_scale_example_file([mean for _, mean, _ in gaussian_mixture_weights_means_variances], recording.name)
+        return ((times, freqs), harmonic_intervals, gaussian_mixture_weights_means_variances)
 
     def _analyze_gmm_collection(
         self,
