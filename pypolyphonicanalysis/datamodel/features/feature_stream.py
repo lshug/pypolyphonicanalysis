@@ -20,6 +20,11 @@ class FeatureStream:
         self._input_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._input_features]
         self._label_feature_arrs = [self._feature_store.generate_or_load_feature_for_sum_track(self._sum_track, feature) for feature in self._label_features]
         self._n_t = self._input_feature_arrs[0].shape[-1]
+        self._maximum_number_of_samples = int(settings.training_mux_number_of_samples_per_sum_track_minute * sum_track.n_frames * settings.hop_length / (settings.sr * 60))
+
+    @property
+    def maximum_number_of_samples(self) -> int:
+        return self._maximum_number_of_samples
 
     def __iter__(self) -> "FeatureStream":
         return self

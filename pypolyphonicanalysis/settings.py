@@ -23,9 +23,9 @@ class Settings(BaseSettings):
     denoise_file_audio_before_prediction: bool = True
     sum_track_provider_number_of_dataloader_partition_jobs: PositiveInt = 10
     sum_track_provider_number_of_multitrack_processing_jobs_per_dataloader_partition: PositiveInt = 10
-    sum_track_provider_features_to_generate_early: frozenset[Features] = Field(default=frozenset({Features.HCQT_MAG, Features.HCQT_PHASE_DIFF, Features.HCQT_PHASE_DIFF}))
+    sum_track_provider_features_to_generate_early: frozenset[Features] = Field(default=frozenset({Features.HCQT_MAG, Features.HCQT_PHASE_DIFF, Features.SALIENCE_MAP}))
     training_mux_number_of_active_streams: PositiveInt = 100
-    training_mux_number_of_samples_per_sum_track: PositiveInt = 10
+    training_mux_number_of_samples_per_sum_track_minute: PositiveInt = 30
 
     # Training and inference
     inference_batch_size: PositiveInt = 4

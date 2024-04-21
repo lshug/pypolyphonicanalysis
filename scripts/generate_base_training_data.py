@@ -13,7 +13,6 @@ from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy imp
     BaseSummingStrategy,
 )
 from pypolyphonicanalysis.datamodel.summing_strategies.direct_sum import DirectSum
-from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
 from pypolyphonicanalysis.datamodel.summing_strategies.room_simulation_sum import RoomSimulationSum, RelativePositionRange
 from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.add_noise import AddNoise
 from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.base_sum_track_processor import BaseSumTrackProcessor
@@ -30,11 +29,11 @@ shuffle = True
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 
+
 feature_store = get_feature_store(settings)
 
 summing_strategies: list[BaseSummingStrategy] = [
     DirectSum(settings),
-    ReverbSum(settings),
     RoomSimulationSum(
         settings,
         room_dim_range=((10, 10), (7.5, 8.5), (3.5, 4.5)),

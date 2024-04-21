@@ -50,7 +50,7 @@ class SumTrackFeatureStreamMux:
                 active_stream, sum_track_split_type = self._rng.choice(active_streams)
                 queues[sum_track_split_type].append(next(active_stream))
                 active_stream_counts[active_stream] += 1
-                if active_stream_counts[active_stream] >= self._settings.training_mux_number_of_samples_per_sum_track:
+                if active_stream_counts[active_stream] >= active_stream.maximum_number_of_samples:
                     del active_stream_counts[active_stream]
                     active_streams.remove((active_stream, sum_track_split_type))
 

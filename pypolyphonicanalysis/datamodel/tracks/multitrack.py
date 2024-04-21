@@ -18,14 +18,13 @@ class Multitrack:
                 self._aligned_tracks = self._align_tracks()
             else:
                 self._aligned_tracks = tuple()
-            self._unaligned_tracks = tuple(track for track in self._unaligned_tracks if track not in self._aligned_tracks)
         return self._aligned_tracks
 
     def save(self) -> None:
         for track in self._tracks:
             track.save()
         for track in self._unaligned_tracks:
-            if track.settings.save_multitrack_tracks_pre_alignment:
+            if track.settings.save_multitrack_tracks_pre_alignment and track not in self._tracks:
                 track.save()
 
     def _align_tracks(self) -> tuple[Track, ...]:

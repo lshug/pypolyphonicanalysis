@@ -24,9 +24,9 @@ def sum_track_is_saved(track_name: str, settings: Settings) -> bool:
     return sum_track_path.is_dir() and sum_track_path.joinpath(".saved").is_file()
 
 
-def load_sum_track(sum_track_name: str, settings: Settings, shallow: bool = False) -> "SumTrack":
+def load_sum_track(sum_track_name: str, settings: Settings, shallow: bool = False, shallow_n_frames: int = 0) -> "SumTrack":
     if shallow:
-        return SumTrack(sum_track_name, Path(), Multitrack([]), settings)
+        return SumTrack(sum_track_name, Path(), Multitrack([]), settings, shallow_n_frames)
     sum_tracks_path = get_sum_tracks_path(settings)
     sum_track_path = sum_tracks_path.joinpath(sum_track_name)
     if not sum_track_path.is_dir():
@@ -42,19 +42,13 @@ def load_sum_track(sum_track_name: str, settings: Settings, shallow: bool = Fals
 
 
 class SumTrack:
-    def __init__(
-        self,
-        name: str,
-        audio_source: Path | FloatArray,
-        source_multitrack: Multitrack,
-        settings: Settings,
-    ) -> None:
+    def __init__(self, name: str, audio_source: Path | FloatArray, source_multitrack: Multitrack, settings: Settings, n_frames: int | None = None) -> None:
         self._name = name
         self._settings = settings
         self._source_multitrack = source_multitrack
         self._audio_source = audio_source
         self._audio_array: FloatArray | None = None
-        self._n_frames: int | None = None
+        self._n_frames: int | None = n_frames
 
     @property
     def name(self) -> str:

@@ -154,7 +154,7 @@ class Track:
             yield self.pitch_shift(semitones)
 
     def time_shift(self, delay: float) -> "Track":
-        shift_prefix = f"ts_{delay}_"
+        shift_prefix = f"ts_{delay:.2f}_"
         track_name = f"{shift_prefix}{self._name}"
         if track_is_saved(track_name, self._settings):
             return load_track(track_name, self._settings)
