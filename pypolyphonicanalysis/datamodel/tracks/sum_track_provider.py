@@ -91,8 +91,7 @@ def process_multitrack_with_summing_strategies(
     else:
         for shift, probability in pitch_shift_probabilities.items():
             if rng.random() <= probability:
-                displacement = rng.uniform(pitch_shift_displacement_range[0], pitch_shift_displacement_range[1])
-                augmented_multitracks.append(multitrack.pitch_shift(shift + displacement))
+                augmented_multitracks.append(multitrack.pitch_shift(shift, pitch_shift_displacement_range))
     for multitrack in augmented_multitracks:
         logger.debug(f"Processing augmented multitrack {multitrack}, split {multitrack_split}")
         if summing_mode == SummingModes.RANDOM:

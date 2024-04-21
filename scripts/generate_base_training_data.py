@@ -26,6 +26,7 @@ from pypolyphonicanalysis.utils.utils import save_train_test_validation_split, c
 settings = Settings()
 shuffle = True
 
+
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.DEBUG)
 

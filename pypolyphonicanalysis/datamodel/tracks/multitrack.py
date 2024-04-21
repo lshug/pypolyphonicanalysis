@@ -36,8 +36,8 @@ class Multitrack:
         tracks = tuple([track.align(n_frames, settings.multitrack_alignment_strategy) for track in self._unaligned_tracks])
         return tracks
 
-    def pitch_shift(self, n_steps: float) -> "Multitrack":
-        return Multitrack([track.pitch_shift(n_steps) for track in self._tracks])
+    def pitch_shift(self, n_steps: float, displacement_range: tuple[float, float] = (0, 0)) -> "Multitrack":
+        return Multitrack([track.pitch_shift(n_steps, displacement_range) for track in self._tracks])
 
     def time_shift_by_ir(self, ir: FloatArray, settings: Settings) -> "Multitrack":
         delay = median_group_delay(ir, settings.sr)
