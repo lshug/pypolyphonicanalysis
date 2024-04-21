@@ -2,6 +2,7 @@ import os
 from pathlib import Path
 
 import librosa
+import numpy as np
 import scipy
 
 from pypolyphonicanalysis.datamodel.summing_strategies.base_summing_strategy import (
@@ -31,10 +32,12 @@ class ReverbSum(BaseSummingStrategy):
             self._ir_file = ir_file
         else:
             self._ir_file = self._get_random_ir_file()
-        self._ir_array, _ = librosa.load(
+        self._ir_array = librosa.load(
             get_irs_path(self._settings).joinpath(self._ir_file).absolute().as_posix(),
             sr=self._settings.sr,
-        )
+        )[
+            0
+        ].astype(np.float32)
 
     def _get_random_ir_file(self) -> str:
         irs_path = get_irs_path(self._settings)

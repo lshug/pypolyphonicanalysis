@@ -38,6 +38,12 @@ class BaseMultipleF0EstimationModel:
             self.model.load_state_dict(torch.load(get_models_path(self._settings).joinpath(f"{name}.pth").absolute().as_posix()))
 
     @property
+    def name(self) -> str:
+        if self._name is None:
+            self.model
+        return self._name
+
+    @property
     def model_input_features(self) -> tuple[InputFeature, ...]:
         return self._model_input_features
 
@@ -49,11 +55,13 @@ class BaseMultipleF0EstimationModel:
     @property
     def model(self) -> nn.Module:
         if self._model is None:
-            self._model = self._create_model().to(self._device)
+            name, model = self._create_model()
+            self._name = name
+            self._model = model.to(self._device)
         return self._model
 
     @abstractmethod
-    def _create_model(self) -> nn.Module:
+    def _create_model(self) -> tuple[str, nn.Module]:
         pass
 
     def predict_on_slice_batch(self, feature_arrays: list[FloatArray]) -> dict[LabelFeature, FloatArray]:
@@ -75,7 +83,7 @@ class BaseMultipleF0EstimationModel:
             ]
             number_of_remainder_slices = self._settings.inference_input_number_of_slices - reshaped_feature_array_batch_list[-1].shape[-1]
             zeros = np.zeros(reshaped_feature_array.shape[:-1] + (number_of_remainder_slices,)).astype(np.float32)
-            reshaped_feature_array_batch_list[-1] = np.concatenate([reshaped_feature_array_batch_list[-1], zeros], 3)
+            reshaped_feature_array_batch_list[-1] = np.concatenate([reshaped_feature_array_batch_list[-1], zeros], -1)
             reshaped_feature_batch = np.vstack(reshaped_feature_array_batch_list)
             reshaped_feature_arrays.append(reshaped_feature_batch)
         predictions: dict[LabelFeature, list[FloatArray]] = {feature: [] for feature in self.model_label_features}
@@ -86,7 +94,7 @@ class BaseMultipleF0EstimationModel:
             for feature, arr in prediction.items():
                 predictions[feature].append(arr)
         concatenated_predictions: dict[LabelFeature, FloatArray] = {
-            feature: np.concatenate(np.concatenate(feature_pred_list, 0), 1).astype(np.float32)[:, :n_t] for feature, feature_pred_list in predictions.items()
+            feature: np.concatenate(np.concatenate(feature_pred_list, 0), -1).astype(np.float32)[..., :n_t] for feature, feature_pred_list in predictions.items()
         }
         return concatenated_predictions
 

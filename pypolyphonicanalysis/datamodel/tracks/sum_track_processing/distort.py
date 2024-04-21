@@ -14,8 +14,8 @@ class Distort(BaseSumTrackProcessor):
             [
                 Aliasing(p=aliasing_cond_p),
                 BitCrush(p=bitcrush_cond_p),
-                ClippingDistortion(clipping_cond_p),
-                TanhDistortion(tanh_cond_p),
+                ClippingDistortion(p=clipping_cond_p),
+                TanhDistortion(p=tanh_cond_p),
             ],
             p=p,
             shuffle=True,

@@ -70,7 +70,7 @@ class SumTrack:
             match self._audio_source:
                 case Path():
                     try:
-                        self._audio_array = librosa.load(self._audio_source.absolute().as_posix(), sr=self._settings.sr, mono=True)[0]
+                        self._audio_array = librosa.load(self._audio_source.absolute().as_posix(), sr=self._settings.sr, mono=True)[0].astype(np.float32)
                     except:
                         raise
                 case _:

@@ -101,4 +101,4 @@ class RoomSimulationSum(BaseSummingStrategy):
         room.simulate()
 
         time_shifted_multitrack = Multitrack([track.time_shift_by_ir(room.rir[0][idx]) for idx, track in enumerate(multitrack)])
-        return room.mic_array.signals[0, :], time_shifted_multitrack
+        return room.mic_array.signals[0, :].astype(np.float32), time_shifted_multitrack
