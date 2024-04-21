@@ -13,7 +13,7 @@ from scipy.io import wavfile
 
 from pypolyphonicanalysis.datamodel.tracks.track_utils import MultitrackAlignmentStrategy
 from pypolyphonicanalysis.settings import Settings
-from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay, check_output_path
+from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay, check_output_path, get_random_number_generator
 
 
 def get_tracks_path(settings: Settings) -> Path:
@@ -134,14 +134,16 @@ class Track:
         with open(track_path.joinpath(".saved"), "a"):
             os.utime(track_path.joinpath(".saved"), None)
 
-    def pitch_shift(self, n_steps: float) -> "Track":
+    def pitch_shift(self, n_steps: float, displacement_range: tuple[float, float] = (0, 0)) -> "Track":
         if n_steps == 0:
             return self
         shift_prefix = f"ps_{n_steps:.2f}_"
         track_name = f"{shift_prefix}{self._name}"
         if track_is_saved(track_name, self._settings):
             return load_track(track_name, self._settings)
-        audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, n_steps).astype(np.float32)
+        rng = get_random_number_generator(self._settings)
+        displacement = rng.uniform(displacement_range[0], displacement_range[1])
+        audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, n_steps + displacement).astype(np.float32)
         frequency_multiplier = 2 ** (n_steps / 12)
         times, freqs = self.f0_trajectory_annotation
         freqs = freqs * frequency_multiplier
