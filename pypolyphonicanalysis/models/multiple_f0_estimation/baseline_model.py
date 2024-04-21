@@ -33,8 +33,8 @@ class BaselineNNModule(BaseFeatureToSalienceMapNNModule):
 
 
 class BaselineModel(BaseMultipleF0EstimationModel):
-    def _create_model(self) -> nn.Module:
-        return BaselineNNModule(self.model_input_features, self._settings)
+    def _create_model(self) -> tuple[str, nn.Module]:
+        return "BaselineModel", BaselineNNModule(self.model_input_features, self._settings)
 
     @property
     def model_label_features(self) -> list[LabelFeature]:

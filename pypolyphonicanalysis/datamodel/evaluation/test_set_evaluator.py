@@ -46,7 +46,8 @@ class TestSetEvaluator:
     def evaluate_model(self, model: BaseMultipleF0EstimationModel) -> pd.DataFrame:
         if Features.SALIENCE_MAP not in model.model_label_features:
             raise ValueError("TestSetEvaluator can only evaluate models that output SALIENCE_MAP")
-        evaluation_path = get_evaluations_path(self._settings)
+        evaluation_path = get_evaluations_path(self._settings).joinpath(model.name)
+        check_output_path(evaluation_path)
         all_scores: list[dict[str, float]] = []
         for idx, sum_track in enumerate(tqdm(self._test_sum_tracks)):
             ground_truth_salience_map = self._feature_store.generate_or_load_feature_for_sum_track(sum_track, Features.SALIENCE_MAP)

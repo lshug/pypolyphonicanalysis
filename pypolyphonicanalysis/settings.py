@@ -2,6 +2,7 @@ from pydantic import Field, PositiveFloat, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from pypolyphonicanalysis.datamodel.features.features import Features, InputFeature
+from pypolyphonicanalysis.datamodel.tracks.track_utils import MultitrackAlignmentStrategy
 
 
 class Settings(BaseSettings):
@@ -15,9 +16,10 @@ class Settings(BaseSettings):
     test_validation_size: PositiveFloat = Field(default=0.2, le=1.0)
     validation_proportion: PositiveFloat = Field(default=1.0, le=1.0)
     save_raw_training_data: bool = True
-    save_multitrack_tracks_pre_trimming: bool = True
+    save_multitrack_tracks_pre_alignment: bool = True
     save_training_features: bool = True
     save_prediction_file_features: bool = True
+    multitrack_alignment_strategy: MultitrackAlignmentStrategy = MultitrackAlignmentStrategy.CYCLE
     denoise_file_audio_before_prediction: bool = True
     sum_track_provider_number_of_dataloader_partition_jobs: PositiveInt = 10
     sum_track_provider_number_of_multitrack_processing_jobs_per_dataloader_partition: PositiveInt = 10

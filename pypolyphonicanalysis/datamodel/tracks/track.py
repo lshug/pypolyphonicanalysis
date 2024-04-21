@@ -1,4 +1,5 @@
 import json
+import math
 import os
 from pathlib import Path
 from typing import Iterable
@@ -10,6 +11,7 @@ import librosa
 from pyrubberband import pyrb
 from scipy.io import wavfile
 
+from pypolyphonicanalysis.datamodel.tracks.track_utils import MultitrackAlignmentStrategy
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray, median_group_delay, check_output_path
 
@@ -85,7 +87,7 @@ class Track:
         if self._audio_array is None:
             match self._audio_source:
                 case Path():
-                    self._audio_array = librosa.load(self._audio_source.absolute().as_posix(), sr=self._settings.sr, mono=True)[0]
+                    self._audio_array = librosa.load(self._audio_source.absolute().as_posix(), sr=self._settings.sr, mono=True)[0].astype(np.float32)
                 case _:
                     source_arr = self._audio_source
                     assert isinstance(source_arr, np.ndarray)
@@ -135,11 +137,11 @@ class Track:
     def pitch_shift(self, n_steps: float) -> "Track":
         if n_steps == 0:
             return self
-        shift_prefix = f"pshift_{n_steps:.2f}_"
+        shift_prefix = f"ps_{n_steps:.2f}_"
         track_name = f"{shift_prefix}{self._name}"
         if track_is_saved(track_name, self._settings):
             return load_track(track_name, self._settings)
-        audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, n_steps)
+        audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, n_steps).astype(np.float32)
         frequency_multiplier = 2 ** (n_steps / 12)
         times, freqs = self.f0_trajectory_annotation
         freqs = freqs * frequency_multiplier
@@ -150,20 +152,16 @@ class Track:
             yield self.pitch_shift(semitones)
 
     def time_shift(self, delay: float) -> "Track":
-        shift_suffix = f"time_shift_{delay}_"
-        track_name = f"{shift_suffix}{self._name}"
+        shift_prefix = f"ts_{delay}_"
+        track_name = f"{shift_prefix}{self._name}"
         if track_is_saved(track_name, self._settings):
             return load_track(track_name, self._settings)
         times, freqs = self.f0_trajectory_annotation
         times = times + delay
-        zeros = np.zeros(
-            (
-                int(
-                    np.ceil(delay * self._settings.sr),
-                )
-            )
-        ).astype(np.float32)
-        audio_array = np.concatenate([zeros, self.audio_array])
+        pad_amount = int(
+            np.ceil(delay * self._settings.sr),
+        )
+        audio_array = np.pad(self.audio_array, ((pad_amount, 0)))
         time_shifted_track = Track(track_name, audio_array, self._settings, (times, freqs))
         return time_shifted_track
 
@@ -181,15 +179,42 @@ class Track:
                 f0[idx] = 0
         return times, f0
 
-    def trim_to_frames(self, n_frames: int) -> "Track":
-        if n_frames == self._n_frames:
+    def align(self, n_frames: int, alignment_strategy: MultitrackAlignmentStrategy) -> "Track":
+        if n_frames == self.n_frames:
             return self
-        if track_is_saved(f"{self.name}_trim_{n_frames}", self._settings):
-            return load_track(f"{self.name}_trim_{n_frames}", self._settings)
+        alignment_suffixes = {MultitrackAlignmentStrategy.PAD: "pad", MultitrackAlignmentStrategy.TRIM: "trim", MultitrackAlignmentStrategy.CYCLE: "cycle"}
+        track_name = f"{self.name}_{alignment_suffixes[alignment_strategy]}_{n_frames}"
+        if track_is_saved(track_name, self._settings):
+            return load_track(track_name, self._settings)
+        match alignment_strategy:
+            case MultitrackAlignmentStrategy.CYCLE:
+                return self.cycle_to_frames(track_name, n_frames)
+            case MultitrackAlignmentStrategy.TRIM:
+                return self.trim_to_frames(track_name, n_frames)
+            case MultitrackAlignmentStrategy.PAD:
+                return self.pad_to_frames(track_name, n_frames)
+            case _:
+                raise NotImplementedError
+
+    def trim_to_frames(self, track_name: str, n_frames: int) -> "Track":
         n_samples = n_frames * self._settings.hop_length
-        return Track(
-            f"{self.name}_trim_{n_frames}", self.audio_array[:n_samples], self._settings, (self.f0_trajectory_annotation[0][:n_frames], self.f0_trajectory_annotation[1][:n_frames])
-        )
+        return Track(track_name, self.audio_array[:n_samples], self._settings, (self.f0_trajectory_annotation[0][:n_frames], self.f0_trajectory_annotation[1][:n_frames]))
+
+    def cycle_to_frames(self, track_name: str, n_frames: int) -> "Track":
+        n_samples = n_frames * self._settings.hop_length
+        repeats = math.ceil(n_frames / self.n_frames)
+        arr = np.tile(self.audio_array, repeats)[:n_samples]
+        f0s = np.tile(self.f0_trajectory_annotation[1], repeats)[:n_frames]
+        times = librosa.times_like(f0s, sr=self._settings.sr)
+        return Track(track_name, arr, self._settings, (times, f0s))
+
+    def pad_to_frames(self, track_name: str, n_frames: int) -> "Track":
+        n_samples = n_frames * self._settings.hop_length
+        samples_diff = self.n_frames * self._settings.hop_length - n_samples
+        frames_diff = n_frames - self.n_frames
+        f0s = np.pad(self.f0_trajectory_annotation[1], ((0, frames_diff)))
+        times = librosa.times_like(f0s, sr=self._settings.sr)
+        return Track(track_name, np.pad(self.audio_array, ((0, samples_diff))), self._settings, (times, f0s))
 
     def __repr__(self) -> str:
         return f"Track({self.name})"
