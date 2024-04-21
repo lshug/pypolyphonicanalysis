@@ -27,7 +27,6 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackPro
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 settings = Settings(use_depthwise_separable_convolution_when_possible=True, use_self_attention=True, training_batch_size=8)
 shuffle = False
@@ -82,7 +81,8 @@ torch_model = model.model
 pitch_shift_augmentation_multiplier = 1 + (sum(prob for prob in pitch_shift_probabilities.values()) if pitch_shift_probabilities is not None else 0)
 all_samples_len = (
     sum(len(loader) * len(summing_strategies_for_loader) for loader, summing_strategies_for_loader in dataloaders_and_summing_strategies)
-    * settings.training_mux_number_of_samples_per_sum_track
+    * settings.training_mux_number_of_samples_per_sum_track_minute
+    * 2.1
     * pitch_shift_augmentation_multiplier
 )
 train_len = int((1 - settings.test_validation_size) * all_samples_len)

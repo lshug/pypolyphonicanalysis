@@ -1,4 +1,5 @@
 import hashlib
+import json
 import logging
 import os
 from functools import cache
@@ -34,6 +35,17 @@ def feature_is_generated_for_file(file: Path, feature: Features, settings: Setti
         return False
     file_feature_store_path = get_features_path(settings).joinpath(f"file_{hashlib.file_digest(open(file, 'rb'), 'md5').hexdigest()}")
     return file_feature_store_path.joinpath(f"{feature.name}.npy").is_file() and file_feature_store_path.joinpath(f"{feature.name}.saved").is_file()
+
+
+def sum_track_n_frames_is_saved_in_feature_store(sum_track_name: str, settings: Settings) -> bool:
+    sum_track_feature_store_path = get_features_path(settings).joinpath(sum_track_name)
+    return sum_track_feature_store_path.joinpath("duration.json").is_file()
+
+
+def get_sum_track_n_frames_from_feature_store(sum_track_name: str, settings: Settings) -> int:
+    sum_track_feature_store_path = get_features_path(settings).joinpath(sum_track_name)
+    n_frames: int = json.load(open(sum_track_feature_store_path.joinpath("n_frames.json")))
+    return n_frames
 
 
 def load_feature_for_sum_track(sum_track: SumTrack, feature: Features, settings: Settings) -> FloatArray:
@@ -122,6 +134,8 @@ class FeatureStore:
         check_output_path(features_path)
         sum_track_features_path = features_path.joinpath(sum_track.name)
         check_output_path(sum_track_features_path)
+        if not sum_track_n_frames_is_saved_in_feature_store(sum_track.name, self._settings):
+            json.dump(sum_track.n_frames, open(sum_track_features_path.joinpath("n_frames.json"), "w"))
         np.save(sum_track_features_path.joinpath(f"{feature.name}.npy"), array)
         with open(sum_track_features_path.joinpath(f"{feature.name}.saved"), "a"):
             os.utime(sum_track_features_path.joinpath(f"{feature.name}.saved"), None)

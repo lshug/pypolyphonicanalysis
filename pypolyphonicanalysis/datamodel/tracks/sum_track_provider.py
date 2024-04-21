@@ -12,7 +12,7 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack, load_sum_t
 from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.base_sum_track_processor import BaseSumTrackProcessor
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_random_number_generator
-from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
+from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store, sum_track_n_frames_is_saved_in_feature_store, get_sum_track_n_frames_from_feature_store
 from joblib import Parallel, delayed
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,9 @@ def process_multitrack_with_summing_strategies(
     sum_track_processors: list[BaseSumTrackProcessor] | None,
     summing_mode: SummingModes,
     settings: Settings,
+    logging_level: int,
 ) -> list[tuple[SumTrack, SumTrackSplitType]]:
+    logging.basicConfig(level=logging_level)
     multitrack_split = generate_random_split(settings)
     rng = get_random_number_generator(settings)
     augmented_multitracks: list[Multitrack] = []
@@ -108,7 +110,9 @@ def process_multitrack_with_summing_strategies(
 def get_multitracks_from_dataloader_partition(
     partition: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]],
     settings: Settings,
+    logging_level: int,
 ) -> list[tuple[Multitrack, list[BaseSummingStrategy]]]:
+    logging.basicConfig(level=logging_level)
     logger.debug(f"Processing dataloader partition {partition}")
     if len(partition) == 0:
         return []
@@ -148,9 +152,10 @@ class SumTrackProvider:
 
     def _get_sum_tracks_from_dataloaders(self) -> SumTrackWithSplitIterable:
         assert self._dataloaders_and_summing_strategies is not None
+        logging_level = logger.getEffectiveLevel()
         dataloader_partitions = partition_list(self._dataloaders_and_summing_strategies, self._settings.sum_track_provider_number_of_dataloader_partition_jobs)
         multitrack_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_dataloader_partition_jobs, return_as="generator", verbose=5)(
-            delayed(get_multitracks_from_dataloader_partition)(partition, self._settings) for partition in dataloader_partitions
+            delayed(get_multitracks_from_dataloader_partition)(partition, self._settings, logging_level) for partition in dataloader_partitions
         )
         for multitrack_list in tqdm(multitrack_lists, desc="Processing dataloader partitions", total=len(dataloader_partitions)):
             sum_track_with_splits_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_multitrack_processing_jobs_per_dataloader_partition, return_as="generator")(
@@ -162,6 +167,7 @@ class SumTrackProvider:
                     self._sum_track_processors,
                     self._summing_mode,
                     self._settings,
+                    logging_level,
                 )
                 for multitrack, summing_strategies in multitrack_list
             )
@@ -172,11 +178,14 @@ class SumTrackProvider:
 
     def _load_or_shallow_load_sum_track(self, sum_track_name: str) -> SumTrack:
         if sum_track_is_saved(sum_track_name, self._settings):
-            sum_track = load_sum_track(sum_track_name, self._settings, False)
+            sum_track = load_sum_track(sum_track_name, self._settings)
             for feature in self._settings.sum_track_provider_features_to_generate_early:
                 get_feature_store(self._settings).generate_or_load_feature_for_sum_track(sum_track, feature)
             return sum_track
-        return load_sum_track(sum_track_name, self._settings, True)
+        if not sum_track_n_frames_is_saved_in_feature_store(sum_track_name, self._settings):
+            raise ValueError("Cannot shallow-load SumTrack with no features saved")
+        n_frames = get_sum_track_n_frames_from_feature_store(sum_track_name, self._settings)
+        return load_sum_track(sum_track_name, self._settings, shallow=True, shallow_n_frames=n_frames)
 
     def _get_sum_tracks_from_train_test_validation_split(self) -> SumTrackWithSplitIterable:
         assert self._train_test_validation_split is not None
