@@ -12,7 +12,12 @@ from pypolyphonicanalysis.datamodel.tracks.sum_track import SumTrack, load_sum_t
 from pypolyphonicanalysis.datamodel.tracks.sum_track_processing.base_sum_track_processor import BaseSumTrackProcessor
 from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import get_random_number_generator
-from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store, sum_track_n_frames_is_saved_in_feature_store, get_sum_track_n_frames_from_feature_store
+from pypolyphonicanalysis.datamodel.features.feature_store import (
+    get_feature_store,
+    sum_track_n_frames_is_saved_in_feature_store,
+    get_sum_track_n_frames_from_feature_store,
+    feature_is_generated_for_sum_track,
+)
 from joblib import Parallel, delayed
 
 logger = logging.getLogger(__name__)
@@ -68,7 +73,8 @@ def process_sum_track(sum_track: SumTrack, sum_track_processors: list[BaseSumTra
     if settings.save_raw_training_data:
         sum_track.save()
     for feature in settings.sum_track_provider_features_to_generate_early:
-        feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
+        if not feature_is_generated_for_sum_track(sum_track, feature, settings):
+            feature_store.generate_or_load_feature_for_sum_track(sum_track, feature)
     return sum_track
 
 
@@ -88,9 +94,8 @@ def process_multitrack_with_summing_strategies(
     augmented_multitracks: list[Multitrack] = []
     sum_tracks_with_splits: list[tuple[SumTrack, SumTrackSplitType]] = []
     logger.debug(f"Augmenting multitrack {multitrack}, split {multitrack_split}")
-    if pitch_shift_probabilities is None:
-        augmented_multitracks.append(multitrack)
-    else:
+    augmented_multitracks.append(multitrack)
+    if pitch_shift_probabilities is not None:
         for shift, probability in pitch_shift_probabilities.items():
             if rng.random() <= probability:
                 augmented_multitracks.append(multitrack.pitch_shift(shift, pitch_shift_displacement_range))
