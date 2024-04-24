@@ -34,7 +34,7 @@ def get_evaluations_path(settings: Settings) -> Path:
     return evaluations_path
 
 
-class TestSetEvaluator:
+class MultipleF0EstimationTestSetEvaluator:
     def __init__(self, sum_track_provider: SumTrackProvider, settings: Settings, max_count: int = -1) -> None:
         self._settings = settings
         self._feature_store = get_feature_store(self._settings)

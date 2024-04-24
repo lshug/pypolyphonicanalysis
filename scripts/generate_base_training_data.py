@@ -57,8 +57,8 @@ dataset_loaders: list[BaseDataLoader] = [
     CantoriaDataLoader(shuffle, settings),
 ]
 dataloaders_and_summing_strategies: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]] = [(dl, summing_strategies) for dl in dataset_loaders]
-pitch_shift_probabilities = {-2: 0.5, -1.5: 0.5, -1: 0.5, -0.3: 0.5, 0: 1, 0.3: 0.5, 1: 0.5, 1.5: 0.5, 2: 0.5}
-pitch_shift_displacement_range = (-0.2, 0.2)
+pitch_shift_probabilities: dict[float, float] = {-1.5: 1, -0.5: 1, 0.5: 1, 1.5: 1}
+pitch_shift_displacement_range = (-0.5, 0.5)
 sum_track_processors: list[BaseSumTrackProcessor] = [AddNoise(settings), Filter(settings), Distort(settings)]
 sum_track_provider = SumTrackProvider(
     settings,
@@ -89,7 +89,7 @@ save_train_test_validation_split(
 )
 
 
-even_numbered_GVM_indicies = [f"GVM{str(idx).zfill(3)}" for idx in range(2, len(GVMDataLoader(shuffle, settings)) + 1, 2)]
+even_numbered_GVM_indicies = [f"GVM{str(idx).zfill(3)}" for idx in range(1, len(GVMDataLoader(shuffle, settings)) + 1, 8)]
 
 
 def filter_gvm_sum_tracks(sum_tracks: list[str]) -> list[str]:
@@ -97,7 +97,7 @@ def filter_gvm_sum_tracks(sum_tracks: list[str]) -> list[str]:
 
 
 save_train_test_validation_split(
-    "base_data_split_noevengvm",
+    "base_data_split_nogvmpart",
     {
         "train": filter_gvm_sum_tracks(split_dict[SumTrackSplitType.TRAIN]),
         "test": filter_gvm_sum_tracks(split_dict[SumTrackSplitType.TEST]),

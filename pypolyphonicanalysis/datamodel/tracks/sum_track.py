@@ -80,6 +80,8 @@ class SumTrack:
         return self._n_frames
 
     def save(self) -> None:
+        if sum_track_is_saved(self.name, self._settings):
+            return
         sum_tracks_path = get_sum_tracks_path(self._settings)
         sum_track_path = sum_tracks_path.joinpath(self.name)
         check_output_path(sum_track_path)

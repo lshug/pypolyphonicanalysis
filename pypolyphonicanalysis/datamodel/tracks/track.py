@@ -23,7 +23,7 @@ def get_tracks_path(settings: Settings) -> Path:
 
 
 def load_f0_trajectory_array_from_path(path: Path) -> tuple[FloatArray, FloatArray]:
-    assert path.is_file()
+    assert path.is_file(), f"No file found at {path}"
     match path.suffix:
         case ".csv":
             arr = pd.read_csv(path, header=None).to_numpy()

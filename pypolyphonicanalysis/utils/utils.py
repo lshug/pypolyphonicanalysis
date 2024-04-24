@@ -217,8 +217,6 @@ def save_reconstructed_audio(
             amplitude=1 / number_of_voices,
             smooth_len=settings.amplitude_smoothing_filter_length,
         )
-        voice_path = os.path.join(output_path, f"{name}_reconstruction_voice{idx}.wav")
-        scipy.io.wavfile.write(voice_path, settings.sr, voice_audio)
         voice_audios.append(voice_audio)
     joint_path = os.path.join(output_path, f"{name}_reconstruction_allvoices.wav")
     joint_audio = sum(voice_audios)
