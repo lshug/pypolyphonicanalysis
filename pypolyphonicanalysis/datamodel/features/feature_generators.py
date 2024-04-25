@@ -83,7 +83,7 @@ class HCQTMagPhaseDiffGenerator(InputFeatureGenerator):
         if self._settings.denoise_file_audio_before_prediction:
             iinfo = np.iinfo(np.int32)
             scale = max(iinfo.max, -iinfo.min)
-            y = noisereduce.reduce_noise(scale * y, self._settings.sr, prop_decrease=self._settings.denoising_proportion) / scale
+            y = noisereduce.reduce_noise((scale * y).astype(np.int32), self._settings.sr, prop_decrease=self._settings.denoising_proportion) / scale
         return self._generate_hcqt_features(y)
 
 

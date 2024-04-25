@@ -1,7 +1,9 @@
+import logging
 import os
 from pathlib import Path
 
 import librosa
+from anbani.nlp.georgianisation import georgianise
 
 from pypolyphonicanalysis.analysis.analysis_runner import (
     AutomaticAnalysisRunner,
@@ -14,6 +16,9 @@ from pypolyphonicanalysis.models.multiple_f0_estimation.baseline_model import Ba
 from pypolyphonicanalysis.analysis.f0_processing.frequency_range_filter import FrequencyRangeFilter
 from pypolyphonicanalysis.analysis.f0_processing.masking_filter import MaskingFilter
 from pypolyphonicanalysis.settings import Settings
+from scripts.conservatoire_corpus_tools.conservatoire_corpus_utils import load_catalog_data, CatalogEntry
+
+logging.basicConfig(level=logging.INFO)
 
 settings = Settings()
 model = BaselineModel(settings, "model")
@@ -27,10 +32,27 @@ processors = [
 
 detrender = LogLinearDetrender()
 
+
+conservatoire_corpus_catalog = load_catalog_data(settings)
+file_stem_entry_dict: dict[str, CatalogEntry] = {Path(entry.file_path).stem: entry for entry in conservatoire_corpus_catalog}
+
+
 svaneti_recordings: list[Recording] = []
 for file in os.listdir("audio/svaneti"):
     if ".wav" in file:
-        svaneti_recordings.append(Recording(name=file.split(".")[0], file_path=Path(f"audio/svaneti/{file}"), number_of_voices=3))
+        file_path = Path(f"audio/svaneti/{file}")
+        entry = file_stem_entry_dict[file_path.stem]
+        recording_date = f"{entry.recording_date_year}-{entry.recording_date_month}-{entry.recording_date_day}"
+        svaneti_recordings.append(
+            Recording(
+                name=file.split(".")[0],
+                file_path=file_path,
+                number_of_voices=3,
+                performers=georgianise(entry.performers[:50], mode="fast") if entry.performers is not None else None,
+                recording_site=georgianise(entry.recording_site, mode="fast") if entry.recording_site is not None else None,
+                recording_date=recording_date if recording_date != "None-None-None" else None,
+            )
+        )
 
 kakheti_recordings: list[Recording] = []
 for file in os.listdir("audio/kakheti"):

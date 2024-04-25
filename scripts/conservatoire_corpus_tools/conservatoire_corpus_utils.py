@@ -156,7 +156,7 @@ class CatalogEntry(BaseModel):
 
 
 def get_conservatoire_corpus_path(settings: Settings) -> Path:
-    return Path(settings.data_directory_path).joinpath("../../data/corpora").joinpath("conservatoire_corpus")
+    return Path(settings.data_directory_path).joinpath("corpora").joinpath("conservatoire_corpus")
 
 
 def load_raw_catalog_data(settings: Settings) -> list[RawCatalogData]:
@@ -181,7 +181,7 @@ def load_raw_catalog_data(settings: Settings) -> list[RawCatalogData]:
 
 def load_catalog_data(settings: Settings) -> list[CatalogEntry]:
     corpus_path = get_conservatoire_corpus_path(settings)
-    return [CatalogEntry(**item) for item in json.load(open(corpus_path.joinpath("exported_data.json")))]
+    return [CatalogEntry.model_validate(json.loads(item)) for item in json.load(open(corpus_path.joinpath("exported_data.json")))]
 
 
 def remove_leading_zeros(s: str) -> str:
