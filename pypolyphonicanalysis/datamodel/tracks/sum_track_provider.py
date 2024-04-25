@@ -31,10 +31,6 @@ class SummingModes(Enum):
 T = TypeVar("T")
 
 
-def partition_list(list_to_partition: list[T], n: int) -> list[list[T]]:
-    return [list_to_partition[idx::n] for idx in range(n)]
-
-
 def generate_random_split(settings: Settings) -> SumTrackSplitType:
     rng = get_random_number_generator(settings)
     if rng.random() < settings.test_validation_size:
@@ -44,12 +40,12 @@ def generate_random_split(settings: Settings) -> SumTrackSplitType:
     return SumTrackSplitType.TRAIN
 
 
-def get_multitrack_generator_from_dataloader_partition(
-    dataloader_partition: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]],
+def get_multitrack_generator_from_dataloaders(
+    dataloaders: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]],
     settings: Settings,
 ) -> Iterable[tuple[Multitrack, list[BaseSummingStrategy]]]:
     rng = get_random_number_generator(settings)
-    dataloader_iters = [(iter(dataloader.get_multitracks()), summing_strategies) for dataloader, summing_strategies in dataloader_partition]
+    dataloader_iters = [(iter(dataloader.get_multitracks()), summing_strategies) for dataloader, summing_strategies in dataloaders]
     while len(dataloader_iters) > 0:
         loader, summing_strategies = rng.choice(dataloader_iters)
         try:
@@ -112,17 +108,16 @@ def process_multitrack_with_summing_strategies(
     return sum_tracks_with_splits
 
 
-def get_multitracks_from_dataloader_partition(
-    partition: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]],
+def get_multitracks_from_dataloaders(
+    dataloaders: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]],
     settings: Settings,
     logging_level: int,
 ) -> list[tuple[Multitrack, list[BaseSummingStrategy]]]:
     logging.basicConfig(level=logging_level)
-    logger.debug(f"Processing dataloader partition {partition}")
-    if len(partition) == 0:
+    if len(dataloaders) == 0:
         return []
-    total = sum(len(dataloader) for dataloader, _ in partition)
-    return list(tqdm(get_multitrack_generator_from_dataloader_partition(partition, settings), "Getting multitracks from partition", total=total))
+    total = sum(len(dataloader) for dataloader, _ in dataloaders)
+    return list(tqdm(get_multitrack_generator_from_dataloaders(dataloaders, settings), "Getting multitracks from dataloaders", total=total))
 
 
 SumTrackWithSplitIterable = Iterable[tuple[SumTrack, SumTrackSplitType]]
@@ -158,28 +153,24 @@ class SumTrackProvider:
     def _get_sum_tracks_from_dataloaders(self) -> SumTrackWithSplitIterable:
         assert self._dataloaders_and_summing_strategies is not None
         logging_level = logger.getEffectiveLevel()
-        dataloader_partitions = partition_list(self._dataloaders_and_summing_strategies, self._settings.sum_track_provider_number_of_dataloader_partition_jobs)
-        multitrack_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_dataloader_partition_jobs, return_as="generator", verbose=5)(
-            delayed(get_multitracks_from_dataloader_partition)(partition, self._settings, logging_level) for partition in dataloader_partitions
-        )
-        for multitrack_list in tqdm(multitrack_lists, desc="Processing dataloader partitions", total=len(dataloader_partitions)):
-            sum_track_with_splits_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_multitrack_processing_jobs_per_dataloader_partition, return_as="generator")(
-                delayed(process_multitrack_with_summing_strategies)(
-                    multitrack,
-                    summing_strategies,
-                    self._pitch_shift_probabilities,
-                    self._pitch_shift_displacement_range,
-                    self._sum_track_processors,
-                    self._summing_mode,
-                    self._settings,
-                    logging_level,
-                )
-                for multitrack, summing_strategies in multitrack_list
+        multitracks = get_multitracks_from_dataloaders(self._dataloaders_and_summing_strategies, self._settings, logging_level)
+        sum_track_with_splits_lists = Parallel(n_jobs=self._settings.sum_track_provider_number_of_multitrack_processing_jobs, return_as="generator")(
+            delayed(process_multitrack_with_summing_strategies)(
+                multitrack,
+                summing_strategies,
+                self._pitch_shift_probabilities,
+                self._pitch_shift_displacement_range,
+                self._sum_track_processors,
+                self._summing_mode,
+                self._settings,
+                logging_level,
             )
-            for sum_track_with_splits_list in tqdm(sum_track_with_splits_lists, desc="Getting SumTracks from multitracks", total=len(multitrack_list)):
-                for sum_track, split in sum_track_with_splits_list:
-                    logger.debug(f"Yielding sum_track {sum_track}, split {split}")
-                    yield sum_track, split
+            for multitrack, summing_strategies in multitracks
+        )
+        for sum_track_with_splits_list in tqdm(sum_track_with_splits_lists, desc="Getting SumTracks from multitracks", total=len(multitracks)):
+            for sum_track, split in sum_track_with_splits_list:
+                logger.debug(f"Yielding sum_track {sum_track}, split {split}")
+                yield sum_track, split
 
     def _load_or_shallow_load_sum_track(self, sum_track_name: str) -> SumTrack:
         if sum_track_is_saved(sum_track_name, self._settings):

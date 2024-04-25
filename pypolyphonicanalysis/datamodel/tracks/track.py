@@ -2,7 +2,6 @@ import json
 import math
 import os
 from pathlib import Path
-from typing import Iterable
 
 import pandas as pd
 import numpy as np
@@ -144,14 +143,10 @@ class Track:
         rng = get_random_number_generator(self._settings)
         displacement = rng.uniform(displacement_range[0], displacement_range[1])
         audio_array = pyrb.pitch_shift(self.audio_array, self._settings.sr, n_steps + displacement).astype(np.float32)
-        frequency_multiplier = 2 ** (n_steps / 12)
+        frequency_multiplier = 2 ** ((n_steps + displacement) / 12)
         times, freqs = self.f0_trajectory_annotation
         freqs = freqs * frequency_multiplier
         return Track(track_name, audio_array, self._settings, (times, freqs))
-
-    def pitch_shift_range(self, lb: int, ub: int) -> Iterable["Track"]:
-        for semitones in range(lb, ub + 1):
-            yield self.pitch_shift(semitones)
 
     def time_shift(self, delay: float) -> "Track":
         shift_prefix = f"ts_{delay:.2f}_"

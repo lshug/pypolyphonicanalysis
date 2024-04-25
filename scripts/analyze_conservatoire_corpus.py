@@ -25,12 +25,12 @@ processors = [
     MostLikelyVoicesFilter(),
 ]
 
-detrender = LogLinearDetrender(settings)
+detrender = LogLinearDetrender()
 
 svaneti_recordings: list[Recording] = []
 for file in os.listdir("audio/svaneti"):
     if ".wav" in file:
-        svaneti_recordings.append(Recording(name=file.split(".")[0], file_path=Path(f"audio/svaneti/{file}")))
+        svaneti_recordings.append(Recording(name=file.split(".")[0], file_path=Path(f"audio/svaneti/{file}"), number_of_voices=3))
 
 kakheti_recordings: list[Recording] = []
 for file in os.listdir("audio/kakheti"):

@@ -11,6 +11,7 @@ import seaborn as sn
 import librosa
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.text import Text
 from pydantic import BaseModel
 from scipy.cluster.hierarchy import dendrogram
 from scipy.io import wavfile
@@ -473,6 +474,7 @@ class AutomaticAnalysisRunner:
 
     def _cluster_gmms(self, distance_matrix: FloatArray, recordings: list[Recording]) -> list[list[Recording]]:
         clusters: list[list[Recording]] = []
+        name_recording_dict = {recording.name: recording for recording in recordings}
 
         clustering = AgglomerativeClustering(
             n_clusters=None,
@@ -510,6 +512,14 @@ class AutomaticAnalysisRunner:
             orientation="right",
             leaf_font_size=6,
         )
+        plt.subplots_adjust(left=0.1)
+        label_points: list[Text] = plt.gca().get_ymajorticklabels()
+        plt.gca().set_clip_on(False)
+        for label_point in label_points:
+            label_recording = name_recording_dict[label_point.get_text()]
+            x, y = label_point.get_position()
+            logger.debug(f"{label_recording}, {x}, {y}")
+
         plt.savefig(self._output_path.joinpath("hierarchical_clustering_dendrogram_of_estimated_gmms.jpg"))
         plt.close()
 
