@@ -99,7 +99,7 @@ def get_estimated_times_and_frequencies_from_salience_map(
     # Adapted from pitch_activations_to_mf0 from DeepSalience
     n_time_frames = pitch_activation_mat.shape[1]
     freq_grid = librosa.cqt_frequencies(
-        n_bins=settings.n_octaves * 12 * settings.over_sample,
+        n_bins=settings.n_octaves * settings.bins_per_octave,
         fmin=settings.fmin,
         bins_per_octave=settings.bins_per_octave,
     )

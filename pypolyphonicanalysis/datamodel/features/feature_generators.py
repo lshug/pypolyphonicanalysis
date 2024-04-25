@@ -3,7 +3,6 @@ from pathlib import Path
 
 import librosa
 import numpy as np
-import pumpp
 from noisereduce import noisereduce
 from scipy.ndimage import filters
 
@@ -39,49 +38,53 @@ class LabelFeatureGenerator(FeatureGenerator):
 class HCQTMagPhaseDiffGenerator(InputFeatureGenerator):
     def __init__(self, settings: Settings) -> None:
         super().__init__(settings)
-        self._hcqt_mag_and_phase_diff_generator_pump = pumpp.Pump(
-            pumpp.feature.HCQTPhaseDiff(
-                name="hcqt_phase_diff",
-                sr=self._settings.sr,
-                hop_length=self._settings.hop_length,
-                fmin=self._settings.fmin,
-                n_octaves=self._settings.n_octaves,
-                over_sample=self._settings.over_sample,
-                harmonics=self._settings.harmonics,
-                log=True,
-                conv="channels_first",
-            )
-        )
 
     @property
     def number_of_features(self) -> int:
         return 2
 
-    def _generate_hcqt_features_from_pump(self, file: Path | None = None, y: FloatArray | None = None) -> list[FloatArray]:
-        if file is None and y is None:
-            raise ValueError("No input file or array provided for generating features from pump")
-        if file is None:
-            hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(y=y, sr=self._settings.sr)
-        else:
-            if self._settings.denoise_file_audio_before_prediction:
-                y, _ = librosa.load(file.absolute().as_posix(), sr=self._settings.sr)
-                y = noisereduce.reduce_noise(y, self._settings.sr)
-                hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(y=y, sr=self._settings.sr)
-            else:
-                hcqt_data = self._hcqt_mag_and_phase_diff_generator_pump(file.absolute().as_posix())
-        mag = hcqt_data["hcqt_phase_diff/mag"][0]
-        phase_diff = hcqt_data["hcqt_phase_diff/dphase"][0]
-        assert isinstance(mag, np.ndarray)
-        assert isinstance(phase_diff, np.ndarray)
-        mag = mag.transpose(0, 2, 1)
-        phase_diff = phase_diff.transpose(0, 2, 1)
-        return [mag, phase_diff]
+    def _phase_to_phase_diff(self, phase: FloatArray) -> FloatArray:
+        dphase = np.zeros_like(phase).astype(np.float32)
+        dphase[:, :, 0] = phase[:, :, 0]
+        dphase[:, :, 1:] = np.diff(np.unwrap(phase, axis=2), axis=2)
+        return dphase
+
+    def _generate_hcqt_features(self, y: FloatArray) -> list[FloatArray]:
+        n_frames = int(librosa.get_duration(y=y, sr=self._settings.sr) * self._settings.sr / self._settings.hop_length)
+        mags: list[FloatArray] = []
+        phases: list[FloatArray] = []
+        for h in self._settings.harmonics:
+            mag, phase = librosa.magphase(
+                librosa.util.fix_length(
+                    librosa.cqt(
+                        y=y,
+                        sr=self._settings.sr,
+                        hop_length=self._settings.hop_length,
+                        fmin=self._settings.fmin * h,
+                        n_bins=(self._settings.n_octaves * self._settings.bins_per_octave),
+                        bins_per_octave=self._settings.bins_per_octave,
+                    ),
+                    size=n_frames,
+                )
+            )
+            mag = librosa.amplitude_to_db(mag, ref=np.max)
+            mags.append(mag)
+            phases.append(phase)
+        mags_array = np.stack(mags).astype(np.float32)
+        phases_array = np.angle(np.stack(phases)).astype(np.float32)
+        phase_diff = self._phase_to_phase_diff(phases_array)
+        return [mags_array, phase_diff]
 
     def generate_features_for_sum_track(self, sum_track: SumTrack) -> list[FloatArray]:
-        return self._generate_hcqt_features_from_pump(y=sum_track.audio_array)
+        return self._generate_hcqt_features(y=sum_track.audio_array)
 
     def generate_features_for_file(self, file: Path) -> list[FloatArray]:
-        return self._generate_hcqt_features_from_pump(file)
+        y, _ = librosa.load(file.absolute().as_posix(), sr=self._settings.sr)
+        if self._settings.denoise_file_audio_before_prediction:
+            iinfo = np.iinfo(np.int32)
+            scale = max(iinfo.max, -iinfo.min)
+            y = noisereduce.reduce_noise(scale * y, self._settings.sr, prop_decrease=self._settings.denoising_proportion) / scale
+        return self._generate_hcqt_features(y)
 
 
 class SalienceMapGenerator(LabelFeatureGenerator):
@@ -105,7 +108,7 @@ class SalienceMapGenerator(LabelFeatureGenerator):
             hop_length=self._settings.hop_length,
         )
         freq_grid = librosa.cqt_frequencies(
-            self._settings.n_octaves * 12 * self._settings.over_sample,
+            self._settings.n_octaves * self._settings.bins_per_octave,
             fmin=self._settings.fmin,
             bins_per_octave=self._settings.bins_per_octave,
         )

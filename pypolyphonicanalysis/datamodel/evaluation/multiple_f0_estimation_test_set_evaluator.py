@@ -28,25 +28,22 @@ pd.set_option("display.width", 1000)
 pd.set_option("display.max_colwidth", 1000)
 
 
-def get_evaluations_path(settings: Settings) -> Path:
-    evaluations_path = Path(settings.data_directory_path).joinpath("evaluations")
-    check_output_path(evaluations_path)
-    return evaluations_path
-
-
 class MultipleF0EstimationTestSetEvaluator:
-    def __init__(self, sum_track_provider: SumTrackProvider, settings: Settings, max_count: int = -1) -> None:
+    def __init__(self, output_path: Path, sum_track_provider: SumTrackProvider, settings: Settings, max_count: int = -1) -> None:
+        check_output_path(output_path)
+        self._output_path = output_path
         self._settings = settings
         self._feature_store = get_feature_store(self._settings)
         self._test_sum_tracks = [sum_track for sum_track, split in sum_track_provider.get_sum_tracks() if split is SumTrackSplitType.TEST]
         get_random_number_generator(settings).shuffle(self._test_sum_tracks)
+
         if max_count != -1:
             self._test_sum_tracks = self._test_sum_tracks[:max_count]
 
     def evaluate_model(self, model: BaseMultipleF0EstimationModel) -> pd.DataFrame:
         if Features.SALIENCE_MAP not in model.model_label_features:
             raise ValueError("TestSetEvaluator can only evaluate models that output SALIENCE_MAP")
-        evaluation_path = get_evaluations_path(self._settings).joinpath(model.name)
+        evaluation_path = self._output_path.joinpath(model.name)
         check_output_path(evaluation_path)
         all_scores: list[dict[str, float]] = []
         for idx, sum_track in enumerate(tqdm(self._test_sum_tracks)):

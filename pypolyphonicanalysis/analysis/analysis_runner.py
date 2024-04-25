@@ -319,6 +319,8 @@ class AutomaticAnalysisRunner:
         else:
             initial_f0s = self._estimate_recording_f0s(recording)
         times, freqs = get_estimated_times_and_frequencies_from_salience_map(initial_f0s, self._settings, True)
+        if len(freqs[freqs != 0]) == 0:
+            raise ValueError(f"No non-zero estimated frequencies in recording {recording.name}")
         save_reconstructed_audio(times, freqs, recording.name, self._output_path, self._settings)
         times, freqs = self._apply_processing_to_times_and_freqs(recording, times, freqs)
 
@@ -559,7 +561,7 @@ class AutomaticAnalysisRunner:
         samples: list[list[float]]
         distance_matrix: list[list[float]]
         samples, distance_matrix = self._generate_distance_matrix(gmm_parameters, recordings)
-        clusters = self._cluster_gmms(np.array(distance_matrix), recordings)
+        clusters = self._cluster_gmms(np.array(distance_matrix), recordings) if len(recordings) > 1 else []
         cluster_weights_means_variances: dict[str, list[tuple[float, float, float]]] = {}
         cluster_idx_name_dict: dict[int, str] = {}
         for cluster_idx, cluster in enumerate(tqdm(clusters, desc="Analyzing clusters")):
