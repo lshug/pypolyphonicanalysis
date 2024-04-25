@@ -1,3 +1,4 @@
+import librosa
 from pydantic import Field, PositiveFloat, PositiveInt
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -10,7 +11,7 @@ class Settings(BaseSettings):
 
     # General
     data_directory_path: str = Field(default="./data")
-    random_seed: int = Field(default=123)
+    random_seed: int = 123
 
     # Tracks, feature generation, sum track provider, data mux
     test_validation_size: PositiveFloat = Field(default=0.2, le=1.0)
@@ -20,9 +21,10 @@ class Settings(BaseSettings):
     save_training_features: bool = True
     save_prediction_file_features: bool = True
     multitrack_alignment_strategy: MultitrackAlignmentStrategy = MultitrackAlignmentStrategy.CYCLE
-    denoise_file_audio_before_prediction: bool = True
+    denoise_file_audio_before_prediction: bool = False
+    denoising_proportion: PositiveFloat = 0.2
     sum_track_provider_number_of_multitrack_processing_jobs: PositiveInt = 64
-    sum_track_provider_features_to_generate_early: frozenset[Features] = Field(default=frozenset({Features.HCQT_MAG, Features.HCQT_PHASE_DIFF, Features.SALIENCE_MAP}))
+    sum_track_provider_features_to_generate_early: frozenset[Features] = frozenset({Features.HCQT_MAG, Features.HCQT_PHASE_DIFF, Features.SALIENCE_MAP})
     training_mux_number_of_active_streams: PositiveInt = 100
     training_mux_number_of_samples_per_sum_track_minute: PositiveInt = 30
 
@@ -33,14 +35,13 @@ class Settings(BaseSettings):
     training_input_number_of_slices: PositiveInt = 50
 
     # Audio, model, feature parameters
-    sr: PositiveInt = Field(default=22050)
-    bins_per_octave: PositiveInt = Field(default=60)
-    n_octaves: PositiveInt = Field(default=6)
-    over_sample: PositiveInt = Field(default=5)
+    sr: PositiveInt = 22050
+    bins_per_octave: PositiveInt = 60
+    n_octaves: PositiveInt = 6
     harmonics: tuple[PositiveInt, ...] = (1, 2, 3, 4, 5)
-    fmin: PositiveFloat = Field(default=32.7)
-    hop_length: PositiveInt = Field(default=256)
-    blur_salience_map: bool = Field(default=True)
+    fmin: PositiveFloat = float(librosa.note_to_hz("C1"))
+    hop_length: PositiveInt = 256
+    blur_salience_map: bool = True
     feature_representation_channels: PositiveInt = 32
     channels_pre_flattening: PositiveInt = 8
 

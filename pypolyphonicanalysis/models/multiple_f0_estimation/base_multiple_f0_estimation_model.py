@@ -126,7 +126,7 @@ class BaseMultipleF0EstimationModel:
                 loss = torch.sum(
                     torch.stack([get_train_loss_function(feature)(model_output[feature], label_feature_tensors[idx]) for idx, (feature, output) in enumerate(model_output.items())])
                 )
-            scaler.scale(loss).backward()  # type: ignore
+            scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
             last_loss = loss.item()
