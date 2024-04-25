@@ -11,17 +11,15 @@ import seaborn as sn
 import librosa
 import numpy as np
 from matplotlib import pyplot as plt
-from matplotlib.text import Text
+from matplotlib.axes import Axes
 from pydantic import BaseModel
 from scipy.cluster.hierarchy import dendrogram
 from scipy.io import wavfile
 from scipy.signal import find_peaks
 from scipy.stats import wasserstein_distance
 from sklearn.cluster import AgglomerativeClustering
-from sklearn.exceptions import NotFittedError
 from sklearn.mixture import GaussianMixture
 from sklearn.neighbors import KernelDensity
-from sklearn.utils.validation import check_is_fitted
 from tqdm import tqdm
 
 from pypolyphonicanalysis.analysis.pitch_drift_detrenders.base_pitch_drift_detrender import BasePitchDriftDetrender
@@ -58,6 +56,34 @@ def get_activation_cache_path(settings: Settings) -> Path:
     return path
 
 
+def reconstruct_gmm_from_parameters(gmm_parameters: list[tuple[float, float, float]], settings: Settings) -> GaussianMixture:
+    weights, means, vars = zip(*gmm_parameters)
+    gmm = GaussianMixture(
+        n_components=len(gmm_parameters),
+        covariance_type="full",
+        random_state=get_random_state(settings),
+    )
+    gmm.means_ = np.array(means).reshape(-1, 1)
+    gmm.covariances_ = np.array(vars).reshape(-1, 1, 1)
+    gmm.weights_ = np.array(weights)
+    gmm.precisions_cholesky_ = np.linalg.cholesky(np.linalg.inv(gmm.covariances_))
+    return gmm
+
+
+def save_gmm_parameters(weights_means_vars: list[tuple[float, float, float]], filename_prefix: str, output_path: Path) -> None:
+    check_output_path(output_path)
+    distribution_table_str = "Component\tWeight\tMean\tStd.\n"
+    for idx in range(len(weights_means_vars)):
+        distribution_table_str += f"{idx + 1}\t\t{weights_means_vars[idx][0]:.4f}\t{weights_means_vars[idx][1]:.2f}\t{weights_means_vars[idx][2] ** 0.5:.4f}\n"
+    open(
+        os.path.join(
+            output_path,
+            f"{filename_prefix}_estimated_distribution_parameters.txt",
+        ),
+        "w",
+    ).write(distribution_table_str)
+
+
 def _get_cluster_recording_idxs_from_child(node: FloatArray, children: FloatArray, number_of_labels: int) -> list[FloatArray]:
     nodes = []
     a, b = node.tolist()
@@ -73,11 +99,14 @@ def _get_cluster_recording_idxs_from_child(node: FloatArray, children: FloatArra
 
 
 class AnalysisResults(BaseModel):
+    # Base F0s
     recording_f0s_dict: dict[Recording, tuple[list[float], list[list[float]]]]
+
+    # Harmonic interval analysis
     recording_harmonic_intervals_dict: dict[Recording, list[float]]
-    recording_gaussian_mixture_weights_means_variances: dict[Recording, list[tuple[float, float, float]]]
-    distance_matrix: list[list[float]]
-    cluster_weights_means_variances: dict[str, list[tuple[float, float, float]]]
+    recording_harmonic_interval_gaussian_mixture_weights_means_variances: dict[Recording, list[tuple[float, float, float]]]
+    harmonic_interval_distribution_distance_matrix: list[list[float]]
+    harmonic_interval_distribution_cluster_weights_means_variances: dict[str, list[tuple[float, float, float]]]
 
 
 class AutomaticAnalysisRunner:
@@ -107,11 +136,24 @@ class AutomaticAnalysisRunner:
         stage: str,
         correction_values: FloatArray | None = None,
     ) -> None:
+        recording_output_path = self._output_path.joinpath(recording.name)
+        check_output_path(recording_output_path)
         name_prefix = f"{recording.name}_{stage}"
-        save_f0_trajectories_csv(self._output_path.joinpath(f"{name_prefix}.csv"), times.tolist(), freqs)
-        plot_predictions(times, freqs, name_prefix, self._output_path, self._settings.default_figsize, correction_values)
+        save_f0_trajectories_csv(recording_output_path.joinpath(f"{name_prefix}.csv"), times.tolist(), freqs)
+        plot_predictions(times, freqs, name_prefix, recording_output_path, self._settings.default_figsize, correction_values)
 
-    def _get_harmonic_intervals(self, freqs: FloatArray, name: str) -> FloatArray:
+    def _save_harmonic_intervals(self, harmonic_intervals: FloatArray, recording: Recording, name: str) -> None:
+        recording_output_path = self._output_path.joinpath(recording.name)
+        check_output_path(recording_output_path)
+        json.dump(
+            harmonic_intervals.tolist(),
+            open(
+                recording_output_path.joinpath(f"{name}_harmonic_intervals.json"),
+                "w",
+            ),
+        )
+
+    def _get_harmonic_intervals(self, freqs: FloatArray) -> FloatArray:
         cents_above_a1 = 1200 * np.log2(freqs / librosa.note_to_hz("A1"), out=-1 * np.inf * np.ones_like(freqs), where=freqs != 0)
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", "invalid value encountered in subtract")
@@ -122,23 +164,19 @@ class AutomaticAnalysisRunner:
         if self._settings.squeeze_harmonic_intervals_into_one_octave:
             harmonic_intervals %= 1200
             harmonic_intervals = harmonic_intervals[harmonic_intervals != 0]
-        json.dump(
-            harmonic_intervals.tolist(),
-            open(
-                self._output_path.joinpath(f"{name}_harmonic_intervals.json"),
-                "w",
-            ),
-        )
         return harmonic_intervals
 
-    def _export_harmonic_interval_distribution_plots_and_files(
+    def _export_recording_harmonic_interval_distribution_plots_and_files(
         self,
         harmonic_intervals: FloatArray,
         kde: KernelDensity,
-        gmm: GaussianMixture,
-        ground_truth_gmm: GaussianMixture | None,
+        gmm_weights_means_vars: list[tuple[float, float, float]],
+        ground_truth_gmm_params: list[tuple[float, float, float]] | None,
         name: str,
     ) -> None:
+        recording_output_path = self._output_path.joinpath(name)
+        check_output_path(recording_output_path)
+        gmm = reconstruct_gmm_from_parameters(gmm_weights_means_vars, self._settings)
         plt.figure(figsize=self._settings.default_figsize)
         x = np.linspace(np.max([np.min(harmonic_intervals), 1]), np.max(harmonic_intervals), 1000).reshape(-1, 1)
         plt.hist(
@@ -157,7 +195,8 @@ class AutomaticAnalysisRunner:
             linestyle="--",
             label="Gaussian Mixture Model",
         )
-        if ground_truth_gmm is not None:
+        if ground_truth_gmm_params is not None:
+            ground_truth_gmm = reconstruct_gmm_from_parameters(ground_truth_gmm_params, self._settings)
             plt.plot(
                 x,
                 np.exp(ground_truth_gmm.score_samples(x)),
@@ -170,10 +209,10 @@ class AutomaticAnalysisRunner:
         plt.xlabel("Values")
         plt.ylabel("Density")
         plt.title(f"Harmonic interval distribution of {name}")
-        plt.savefig(self._output_path.joinpath(f"{name}_harmonic_interval_distribution.jpg"))
+        plt.savefig(recording_output_path.joinpath(f"{name}_harmonic_interval_distribution.jpg"))
         plt.close()
 
-        weights_means_and_vars = sorted(
+        weights_means_vars = sorted(
             list(
                 zip(
                     gmm.weights_.reshape(-1).tolist(),
@@ -183,13 +222,44 @@ class AutomaticAnalysisRunner:
             ),
             key=lambda weight_mean_and_var: weight_mean_and_var[1],
         )
+        save_gmm_parameters(weights_means_vars, name, recording_output_path)
+        self._generate_gmm_derived_scale_example_file([mean for _, mean, _ in weights_means_vars], name, recording_output_path)
 
-        self._save_gmm_parameters(weights_means_and_vars, name)
+    def _export_cluster_harmonic_interval_distribution_plots_and_files(
+        self,
+        average_gmm_weights_means_vars: list[tuple[float, float, float]],
+        individual_gmm_params: list[list[tuple[float, float, float]]],
+        name: str,
+        safe_filename_prefix: str,
+    ) -> None:
+        cluster_output_path = self._output_path.joinpath(safe_filename_prefix)
+        check_output_path(cluster_output_path)
+        save_gmm_parameters(average_gmm_weights_means_vars, safe_filename_prefix, cluster_output_path)
+        x = np.linspace(1, 1300, 1000).reshape(-1, 1)
+        plt.figure(figsize=self._settings.default_figsize)
+        for single_gmm in [reconstruct_gmm_from_parameters(params, self._settings) for params in individual_gmm_params]:
+            plt.plot(x, np.exp(single_gmm.score_samples(x.reshape(-1, 1))), color="black")
+        gmm = reconstruct_gmm_from_parameters(average_gmm_weights_means_vars, self._settings)
+        self._generate_gmm_derived_scale_example_file([mean for mean in gmm.means_.reshape(-1)], safe_filename_prefix, cluster_output_path)
+        plt.plot(x, np.exp(gmm.score_samples(x)), color="red")
+        plt.xlabel("Values")
+        plt.ylabel("Density")
+        plt.suptitle("Harmonic interval distribution (average of estimated Gaussian Mixtures)")
+        plt.title(
+            "\n".join(
+                wrap(
+                    f"{safe_filename_prefix}: {name if len(name) < 250 else f'{name[:250]}...]'}",
+                    120,
+                )
+            ),
+        )
+        plt.savefig(cluster_output_path.joinpath(f"{safe_filename_prefix}_harmonic_interval_distribution.jpg"))
+        plt.close()
 
-    def _model_harmonic_interval_distribution(self, harmonic_intervals: FloatArray, name: str) -> tuple[GaussianMixture, KernelDensity, list[tuple[float, float, float]]]:
+    def _model_harmonic_interval_distribution(self, harmonic_intervals: FloatArray, name: str) -> tuple[list[tuple[float, float, float]], KernelDensity]:
         if len(harmonic_intervals) == 0:
             logger.warning(f"No harmonic intervals found in {name}")
-            return GaussianMixture(), KernelDensity(), [(0, 0, 0)]
+            return [], KernelDensity()
         x = np.linspace(np.max([np.min(harmonic_intervals), 1]), np.max(harmonic_intervals), 1000).reshape(-1, 1)
         kde = KernelDensity(bandwidth=self._settings.density_estimation_bandwidth, kernel="gaussian")
         kde.fit(harmonic_intervals.reshape(-1, 1))
@@ -202,11 +272,11 @@ class AutomaticAnalysisRunner:
 
         if peak_number == 0:
             logger.warning(f"Peak-finding returned 0 peaks for {name}")
-            return GaussianMixture(), KernelDensity(), [(0, 0, 0)]
+            return [], KernelDensity()
 
         gmm = GaussianMixture(n_components=peak_number, random_state=get_random_state(self._settings))
         gmm.fit(harmonic_intervals.reshape(-1, 1))
-        weights_means_and_vars = sorted(
+        weights_means_vars = sorted(
             list(
                 zip(
                     gmm.weights_.reshape(-1).tolist(),
@@ -217,9 +287,10 @@ class AutomaticAnalysisRunner:
             key=lambda weight_mean_and_var: weight_mean_and_var[1],
         )
 
-        return gmm, kde, weights_means_and_vars
+        return weights_means_vars, kde
 
-    def _generate_gmm_derived_scale_example_file(self, means: list[float], name: str) -> None:
+    def _generate_gmm_derived_scale_example_file(self, means: list[float], name: str, output_path: Path) -> None:
+        check_output_path(output_path)
         sr = self._settings.sr
         arr = np.array([])
         for mean in sorted(means):
@@ -227,23 +298,9 @@ class AutomaticAnalysisRunner:
             t = np.linspace(0.0, 0.5, int(sr * 0.5))
             y = np.sin(freq * t)
             arr = np.concatenate((arr, y))
-        wavfile.write(self._output_path.joinpath(f"{name}_dervied_scale.wav"), sr, arr)
+        wavfile.write(output_path.joinpath(f"{name}_dervied_scale.wav"), sr, arr)
 
-    def _save_gmm_parameters(self, weights_means_and_vars: list[tuple[float, float, float]], filename_prefix: str) -> None:
-        distribution_table_str = "Component\tWeight\tMean\tStd.\n"
-
-        for idx in range(len(weights_means_and_vars)):
-            distribution_table_str += f"{idx + 1}\t\t{weights_means_and_vars[idx][0]:.4f}\t{weights_means_and_vars[idx][1]:.2f}\t{weights_means_and_vars[idx][2] ** 0.5:.4f}\n"
-        open(
-            os.path.join(
-                self._output_path,
-                f"{filename_prefix}_estimated_distribution_parameters.txt",
-            ),
-            "w",
-        ).write(distribution_table_str)
-
-    def _get_ground_truth_gmm(self, recording: Recording) -> GaussianMixture | None:
-        gmm: GaussianMixture | None
+    def _get_harmonic_interval_ground_truth_gmm_parameters(self, recording: Recording) -> list[tuple[float, float, float]] | None:
         if recording.ground_truth_files is None:
             return None
         name = f"ground_truth_{recording.name}"
@@ -259,16 +316,15 @@ class AutomaticAnalysisRunner:
             tracks.append(track)
         freq_array = np.stack([track.f0_trajectory_annotation[1] for track in tracks]).transpose()
         freq_array = np.sort(freq_array, 1)
-        harmonic_intervals = self._get_harmonic_intervals(freq_array, name)
-        gmm, _, _ = self._model_harmonic_interval_distribution(harmonic_intervals, name)
-        try:
-            check_is_fitted(gmm)
-        except NotFittedError:
-            gmm = None
+        harmonic_intervals = self._get_harmonic_intervals(freq_array)
+        self._save_harmonic_intervals(harmonic_intervals, recording, "ground_truth")
+        weights_means_vars, _ = self._model_harmonic_interval_distribution(harmonic_intervals, name)
         if self._settings.save_ground_truth_track_data:
             for track in unsaved_tracks:
                 track.save()
-        return gmm
+        if len(weights_means_vars) == 0:
+            return None
+        return weights_means_vars
 
     def _apply_processing_to_times_and_freqs(self, recording: Recording, times: FloatArray, freqs: FloatArray) -> F0TimesAndFrequencies:
         if len(self._processors) == 0 and self._detrender is not None:
@@ -321,70 +377,40 @@ class AutomaticAnalysisRunner:
         times, freqs = get_estimated_times_and_frequencies_from_salience_map(initial_f0s, self._settings, True)
         if len(freqs[freqs != 0]) == 0:
             raise ValueError(f"No non-zero estimated frequencies in recording {recording.name}")
-        save_reconstructed_audio(times, freqs, recording.name, self._output_path, self._settings)
+        recording_output_path = self._output_path.joinpath(recording.name)
+        check_output_path(recording_output_path)
+        save_reconstructed_audio(times, freqs, recording.name, recording_output_path, self._settings)
         times, freqs = self._apply_processing_to_times_and_freqs(recording, times, freqs)
 
-        harmonic_intervals = self._get_harmonic_intervals(freqs, recording.name)
-        gmm, kde, gaussian_mixture_weights_means_variances = self._model_harmonic_interval_distribution(harmonic_intervals, recording.name)
-        self._export_harmonic_interval_distribution_plots_and_files(harmonic_intervals, kde, gmm, self._get_ground_truth_gmm(recording), recording.name)
-        self._generate_gmm_derived_scale_example_file([mean for _, mean, _ in gaussian_mixture_weights_means_variances], recording.name)
+        harmonic_intervals = self._get_harmonic_intervals(freqs)
+        self._save_harmonic_intervals(harmonic_intervals, recording, recording.name)
+        gaussian_mixture_weights_means_variances, kde = self._model_harmonic_interval_distribution(harmonic_intervals, recording.name)
+        self._export_recording_harmonic_interval_distribution_plots_and_files(
+            harmonic_intervals, kde, gaussian_mixture_weights_means_variances, self._get_harmonic_interval_ground_truth_gmm_parameters(recording), recording.name
+        )
+
         return ((times, freqs), harmonic_intervals, gaussian_mixture_weights_means_variances)
 
-    def _analyze_gmm_collection(
+    def _get_average_gmm_parameters(
         self,
         gmm_parameters: list[list[tuple[float, float, float]]],
-        name: str,
-        safe_filename_prefix: str,
-    ) -> tuple[GaussianMixture, KernelDensity, list[tuple[float, float, float]]]:
+    ) -> list[tuple[float, float, float]]:
         x = np.linspace(1, 1300, 1000).reshape(-1, 1)
         plt.figure(figsize=self._settings.default_figsize)
         combined_weights: list[float] = []
         combined_means: list[float] = []
         combined_vars: list[float] = []
+        single_gmms: list[GaussianMixture] = []
         for gmm_params in gmm_parameters:
-            if gmm_params == [(0, 0, 0)]:
+            if gmm_params == []:
                 continue
-            weights, means, vars = zip(*gmm_params)
-            combined_weights.extend((np.array(weights) / len(gmm_parameters)).tolist())
-            combined_means.extend(means)
-            combined_vars.extend(vars)
-            cov = np.array(vars).reshape(-1, 1, 1)
-            single_gmm = GaussianMixture(
-                n_components=len(means),
-                covariance_type="full",
-                random_state=get_random_state(self._settings),
-            )
-            single_gmm.means_ = np.array(means).reshape(-1, 1)
-            single_gmm.covariances_ = cov
-            single_gmm.weights_ = weights
-            single_gmm.precisions_cholesky_ = np.linalg.cholesky(np.linalg.inv(cov))
-            plt.plot(x, np.exp(single_gmm.score_samples(x.reshape(-1, 1))))
-        plt.xlabel("Values")
-        plt.ylabel("Density")
-        plt.suptitle("Harmonic interval distributions (estimated Gaussian Mixtures)")
-        plt.title(
-            "\n".join(
-                wrap(
-                    f"{safe_filename_prefix}: {name if len(name) < 250 else f'{name[:250]}...]'}",
-                    120,
-                )
-            ),
-            fontsize=5,
-        )
-        plt.savefig(self._output_path.joinpath(f"{safe_filename_prefix}_harmonic_interval_distributions.jpg"))
-        plt.close()
+            single_gmm = reconstruct_gmm_from_parameters(gmm_params, self._settings)
+            combined_weights.extend((np.array(single_gmm.weights_).reshape(-1) / len(gmm_parameters)).tolist())
+            combined_means.extend(single_gmm.means_.reshape(-1).tolist())
+            combined_vars.extend(single_gmm.covariances_.reshape(-1).tolist())
+            single_gmms.append(single_gmm)
 
-        cov = np.array(combined_vars).reshape(-1, 1, 1)
-        concatenated_gmm = GaussianMixture(
-            n_components=len(combined_means),
-            covariance_type="full",
-            random_state=get_random_state(self._settings),
-        )
-        concatenated_gmm.means_ = np.array(combined_means).reshape(-1, 1)
-        concatenated_gmm.covariances_ = cov
-        concatenated_gmm.weights_ = np.array(combined_weights)
-        concatenated_gmm.precisions_cholesky_ = np.linalg.cholesky(np.linalg.inv(cov))
-
+        concatenated_gmm = reconstruct_gmm_from_parameters(list(zip(combined_weights, combined_means, combined_vars)), self._settings)
         kde = KernelDensity(bandwidth=self._settings.density_estimation_bandwidth, kernel="gaussian")
         gmm_samples = np.array(concatenated_gmm.sample(6000)[0]).reshape(-1, 1)
         kde.fit(gmm_samples)
@@ -400,25 +426,7 @@ class AutomaticAnalysisRunner:
         gmm = GaussianMixture(n_components=peak_number, random_state=get_random_state(self._settings))
         gmm.fit(kde.sample(6000))
 
-        self._generate_gmm_derived_scale_example_file([mean for mean in gmm.means_.reshape(-1)], safe_filename_prefix)
-
-        plt.figure(figsize=self._settings.default_figsize)
-        plt.plot(x, np.exp(gmm.score_samples(x)))
-        plt.xlabel("Values")
-        plt.ylabel("Density")
-        plt.suptitle("Harmonic interval distribution (average of estimated Gaussian Mixtures)")
-        plt.title(
-            "\n".join(
-                wrap(
-                    f"{safe_filename_prefix}: {name if len(name) < 250 else f'{name[:250]}...]'}",
-                    120,
-                )
-            ),
-        )
-        plt.savefig(self._output_path.joinpath(f"{safe_filename_prefix}_harmonic_interval_distribution.jpg"))
-        plt.close()
-
-        weights_means_and_vars = sorted(
+        weights_means_vars = sorted(
             list(
                 zip(
                     gmm.weights_.reshape(-1).tolist(),
@@ -428,17 +436,17 @@ class AutomaticAnalysisRunner:
             ),
             key=lambda weight_mean_and_var: weight_mean_and_var[1],
         )
-        self._save_gmm_parameters(weights_means_and_vars, safe_filename_prefix)
-        return gmm, kde, weights_means_and_vars
+
+        return weights_means_vars
 
     def _generate_distance_matrix(
         self,
         gmm_parameters: list[list[tuple[float, float, float]]],
         recordings: list[Recording],
-    ) -> tuple[list[list[float]], list[list[float]]]:
+    ) -> list[list[float]]:
         samples: list[list[float]] = []
         for idx, gmm_params in enumerate(gmm_parameters):
-            if gmm_params == [(0, 0, 0)]:
+            if gmm_params == []:
                 logger.info(f"Empty GMM found for {recordings[idx].name}, skipping sampling.")
                 samples.append([0])
                 continue
@@ -468,15 +476,18 @@ class AutomaticAnalysisRunner:
             columns=[recording.name for recording in recordings],
         )
         plt.figure(figsize=self._settings.default_figsize)
-        sn.heatmap(df_cm, annot=True)
-        plt.title("Estimated harmonic interval distributions' Wasserstein distance distance matrix")
+        sn.heatmap(df_cm, annot=True, fmt="g")
+        plt.title("Estimated interval distributions' Wasserstein distance matrix")
         plt.savefig(os.path.join(self._output_path, "distribution_distance_matrix.jpg"))
         plt.close()
-        return samples, distance_matrix.tolist()
+        distance_matrix_list: list[list[float]] = distance_matrix.tolist()
+        return distance_matrix_list
 
-    def _cluster_gmms(self, distance_matrix: FloatArray, recordings: list[Recording]) -> list[list[Recording]]:
+    def _cluster_gmms(
+        self, distance_matrix: FloatArray, recordings: list[Recording], recording_gmm_param_dict: dict[Recording, list[tuple[float, float, float]]]
+    ) -> list[list[Recording]]:
         clusters: list[list[Recording]] = []
-        name_recording_dict = {recording.name: recording for recording in recordings}
+        name_recording_dict: dict[str, Recording] = {recording.name: recording for recording in recordings}
 
         clustering = AgglomerativeClustering(
             n_clusters=None,
@@ -505,25 +516,62 @@ class AutomaticAnalysisRunner:
         fig_width = 2 * max(len(recording.name) for recording in recordings)
         fig_height = int(distance_matrix.shape[0] * 1.5)
 
-        plt.figure(figsize=(fig_width, fig_height))
-        plt.xlabel("Wasserstein distance")
-        plt.title("Hierarchical Clustering Dendrogram of Estimated GMMs")
+        axs: list[Axes]
+        fig, axs = plt.subplots(1, 2, width_ratios=[0.1, 0.9], figsize=(fig_width, fig_height))
+        distribution_ax = axs[0]
+        dendrogram_ax = axs[1]
+
+        dendrogram_ax.set_xlabel("Wasserstein distance")
+        dendrogram_ax.set_title("Hierarchical Clustering Dendrogram of Estimated GMMs")
+
         dendrogram(
             linkage_matrix,
+            ax=dendrogram_ax,
             labels=[recording.name for recording in recordings],
             orientation="right",
             leaf_font_size=6,
         )
-        plt.subplots_adjust(left=0.1)
-        label_points: list[Text] = plt.gca().get_ymajorticklabels()
-        plt.gca().set_clip_on(False)
-        for label_point in label_points:
-            label_recording = name_recording_dict[label_point.get_text()]
-            x, y = label_point.get_position()
-            logger.debug(f"{label_recording}, {x}, {y}")
 
-        plt.savefig(self._output_path.joinpath("hierarchical_clustering_dendrogram_of_estimated_gmms.jpg"))
-        plt.close()
+        tick_labels = []
+        tick_gmms = []
+        for label_point in dendrogram_ax.get_ymajorticklabels():
+            label_recording = name_recording_dict[label_point.get_text()]
+            tick_gmms.append(reconstruct_gmm_from_parameters(recording_gmm_param_dict[label_recording], self._settings))
+            lines = [label_point.get_text()]
+            if label_recording.performers is not None:
+                lines.append(label_recording.performers)
+            if label_recording.recording_site is not None:
+                lines.append(label_recording.recording_site)
+            if label_recording.recording_date is not None:
+                lines.append(label_recording.recording_date)
+            tick_labels.append("\n".join(lines))
+
+        dendrogram_ax.set_yticklabels(tick_labels)
+        ticks = dendrogram_ax.get_yticks()
+        tick_width = np.diff(ticks)[-1]
+        y_lim = dendrogram_ax.get_ylim()
+
+        distribution_ax.set_title("Interval distribution")
+        distribution_ax.set_xlabel("Cents")
+        distribution_ax.set_xlim(0, 1200)
+        distribution_ax.set_ylim(y_lim)
+        distribution_ax.set_yticks(ticks)
+        distribution_ax.set_yticklabels(tick_labels, fontsize=6)
+        distribution_ax.set_xticks(np.arange(0, 1200, 100))
+        distribution_ax.tick_params(axis="x", labelsize=6)
+        distribution_ax.grid(axis="x", color="red", linestyle="dashed")
+
+        x = np.linspace(1, 1199, 1200).reshape(-1, 1)
+        x_corners = np.arange(0, 1201, 1)
+        y_corners = np.arange(0, len(recordings) + 1, 1) * tick_width
+        exps = np.array([np.exp(gmm.score_samples(x)) for gmm in tick_gmms])
+        color_data = exps / np.max(exps, axis=1).reshape(-1, 1)
+        color_data = 1 / (1 + np.exp(-color_data))
+
+        distribution_ax.pcolormesh(x_corners, y_corners, color_data, cmap="binary", norm=None)
+
+        fig.savefig(self._output_path.joinpath("hierarchical_clustering_dendrogram_of_estimated_gmms.jpg"))
+        plt.close(fig)
 
         return clusters
 
@@ -537,17 +585,18 @@ class AutomaticAnalysisRunner:
         logger.info(f"Analyzing cluster {cluster_name}")
         safe_filename_prefix = f"cluster_{cluster_idx}"
         cluster_gaussian_mixture_weights_means_variances = [recording_gaussian_mixture_weights_means_variances[recording] for recording in cluster]
-        _, _, weights_means_variances = self._analyze_gmm_collection(
+        weights_means_variances = self._get_average_gmm_parameters(
             cluster_gaussian_mixture_weights_means_variances,
-            cluster_name,
-            safe_filename_prefix,
+        )
+        self._export_cluster_harmonic_interval_distribution_plots_and_files(
+            weights_means_variances, cluster_gaussian_mixture_weights_means_variances, cluster_name, safe_filename_prefix
         )
         return weights_means_variances
 
     def generate_analysis_results(self, recordings: list[Recording]) -> AnalysisResults:
         recording_f0s_dict: dict[Recording, tuple[list[float], list[list[float]]]] = {}
         recording_harmonic_intervals_dict: dict[Recording, list[float]] = {}
-        recording_gaussian_mixture_weights_means_variances: dict[Recording, list[tuple[float, float, float]]] = {}
+        recording_harmonic_interval_gaussian_mixture_weights_means_variances: dict[Recording, list[tuple[float, float, float]]] = {}
         for recording in tqdm(recordings, desc="Analyzing recordings"):
             (
                 recording_f0s,
@@ -556,20 +605,23 @@ class AutomaticAnalysisRunner:
             ) = self._analyze_recording(recording)
             recording_f0s_dict[recording] = (recording_f0s[0].tolist(), [[val for val in row if val > 0] for row in recording_f0s[1].tolist()])
             recording_harmonic_intervals_dict[recording] = harmonic_intervals.tolist()
-            recording_gaussian_mixture_weights_means_variances[recording] = gaussian_mixture_weights_means_variances
-        gmm_parameters = list(recording_gaussian_mixture_weights_means_variances.values())
-        samples: list[list[float]]
-        distance_matrix: list[list[float]]
-        samples, distance_matrix = self._generate_distance_matrix(gmm_parameters, recordings)
-        clusters = self._cluster_gmms(np.array(distance_matrix), recordings) if len(recordings) > 1 else []
-        cluster_weights_means_variances: dict[str, list[tuple[float, float, float]]] = {}
+            recording_harmonic_interval_gaussian_mixture_weights_means_variances[recording] = gaussian_mixture_weights_means_variances
+        harmonic_gmm_parameters = list(recording_harmonic_interval_gaussian_mixture_weights_means_variances.values())
+        harmonic_interval_distribution_distance_matrix: list[list[float]] = self._generate_distance_matrix(harmonic_gmm_parameters, recordings)
+
+        harmonic_interval_distribution_clusters = (
+            self._cluster_gmms(np.array(harmonic_interval_distribution_distance_matrix), recordings, recording_harmonic_interval_gaussian_mixture_weights_means_variances)
+            if len(recordings) > 1
+            else []
+        )
+        harmonic_interval_distribution_cluster_weights_means_variances: dict[str, list[tuple[float, float, float]]] = {}
         cluster_idx_name_dict: dict[int, str] = {}
-        for cluster_idx, cluster in enumerate(tqdm(clusters, desc="Analyzing clusters")):
+        for cluster_idx, cluster in enumerate(tqdm(harmonic_interval_distribution_clusters, desc="Analyzing harmonic_interval_distribution_clusters")):
             cluster_name = json.dumps(sorted(recording.name for recording in cluster))
             cluster_idx_name_dict[cluster_idx] = cluster_name
-            cluster_weights_means_variances[cluster_name] = self._analyze_cluster(
+            harmonic_interval_distribution_cluster_weights_means_variances[cluster_name] = self._analyze_cluster(
                 cluster,
-                recording_gaussian_mixture_weights_means_variances,
+                recording_harmonic_interval_gaussian_mixture_weights_means_variances,
                 cluster_name,
                 cluster_idx,
             )
@@ -582,9 +634,9 @@ class AutomaticAnalysisRunner:
         results = AnalysisResults(
             recording_f0s_dict=recording_f0s_dict,
             recording_harmonic_intervals_dict=recording_harmonic_intervals_dict,
-            recording_gaussian_mixture_weights_means_variances=recording_gaussian_mixture_weights_means_variances,
-            distance_matrix=distance_matrix,
-            cluster_weights_means_variances=cluster_weights_means_variances,
+            recording_harmonic_interval_gaussian_mixture_weights_means_variances=recording_harmonic_interval_gaussian_mixture_weights_means_variances,
+            harmonic_interval_distribution_distance_matrix=harmonic_interval_distribution_distance_matrix,
+            harmonic_interval_distribution_cluster_weights_means_variances=harmonic_interval_distribution_cluster_weights_means_variances,
         )
         open(os.path.join(self._output_path, "analysis_results_serialization.json"), "w").write(results.model_dump_json())
         return results

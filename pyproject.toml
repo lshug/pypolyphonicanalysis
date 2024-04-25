@@ -39,6 +39,7 @@ tensorboard = "^2.16.2"
 requests = "2.31.0"
 pydub = "^0.25.1"
 setuptools = "^69.2.0"
+anbani = "^0.9.5"
 
 
 [build-system]
