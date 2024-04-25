@@ -1,13 +1,10 @@
 import abc
 
 
-from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.utils.utils import FloatArray
 
 
 class BasePitchDriftDetrender(abc.ABC):
-    def __init__(self, settings: Settings) -> None:
-        self._settings = settings
 
     @abc.abstractmethod
     def get_correction_values(self, times: FloatArray, freqs: FloatArray) -> FloatArray:

@@ -1,6 +1,7 @@
 import logging
 from pathlib import Path
 
+from pypolyphonicanalysis.datamodel.summing_strategies.reverb_sum import ReverbSum
 from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.tracks.splits import SumTrackSplitType
 from pypolyphonicanalysis.datamodel.dataloaders.base_data_loader import BaseDataLoader
@@ -48,15 +49,15 @@ summing_strategies: list[BaseSummingStrategy] = [
         rt60_range=(0.3, 0.8),
         max_rand_disp_rel_range=(0.03, 0.06),
     ),
+    ReverbSum(settings),
 ]
-dataset_loaders: list[BaseDataLoader] = [
-    CSDDataloader(shuffle, settings),
-    GVMDataLoader(shuffle, settings),
-    DCSDataLoader(shuffle, settings),
-    ESMUCDataLoader(shuffle, settings),
-    CantoriaDataLoader(shuffle, settings),
+dataloaders_and_summing_strategies: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]] = [
+    (CSDDataloader(shuffle, settings), summing_strategies[:2]),
+    (GVMDataLoader(shuffle, settings), summing_strategies[:2]),
+    (DCSDataLoader(shuffle, settings), summing_strategies),
+    (ESMUCDataLoader(shuffle, settings), summing_strategies[:2]),
+    (CantoriaDataLoader(shuffle, settings), summing_strategies),
 ]
-dataloaders_and_summing_strategies: list[tuple[BaseDataLoader, list[BaseSummingStrategy]]] = [(dl, summing_strategies) for dl in dataset_loaders]
 pitch_shift_probabilities: dict[float, float] = {-1.5: 1, -0.5: 1, 0.5: 1, 1.5: 1}
 pitch_shift_displacement_range = (-0.5, 0.5)
 sum_track_processors: list[BaseSumTrackProcessor] = [AddNoise(settings), Filter(settings), Distort(settings)]
@@ -64,7 +65,7 @@ sum_track_provider = SumTrackProvider(
     settings,
     dataloaders_and_summing_strategies=dataloaders_and_summing_strategies,
     pitch_shift_probabilities=pitch_shift_probabilities,
-    pitch_shift_displacement_range=(-0.2, 0.2),
+    pitch_shift_displacement_range=pitch_shift_displacement_range,
     sum_track_processors=sum_track_processors,
 )
 
