@@ -28,7 +28,7 @@ class BaseDataLoader(abc.ABC):
 
     def get_multitracks(self) -> Iterable[Multitrack]:
         for multitrack in self._get_multitracks():
-            logger.debug(f"Yielding multitrack {multitrack} from {self}")
+            logger.info(f"Yielding multitrack {multitrack} from {self}")
             yield multitrack
             self._count += 1
             if self._count > self._maxlen:

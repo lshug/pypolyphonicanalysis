@@ -26,7 +26,7 @@ from pypolyphonicanalysis.settings import Settings
 from pypolyphonicanalysis.datamodel.tracks.sum_track_provider import SumTrackProvider
 from pypolyphonicanalysis.datamodel.features.feature_store import get_feature_store
 
-logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
 settings = Settings(use_depthwise_separable_convolution_when_possible=True, use_self_attention=True, training_batch_size=8)
 shuffle = False

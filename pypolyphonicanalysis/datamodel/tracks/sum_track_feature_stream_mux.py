@@ -16,12 +16,24 @@ logger = logging.getLogger(__name__)
 
 
 class SumTrackFeatureStreamMux:
-    def __init__(self, sum_track_provider: SumTrackProvider, input_features: list[InputFeature], label_features: list[LabelFeature], settings: Settings) -> None:
+    def __init__(
+        self,
+        sum_track_provider: SumTrackProvider,
+        input_features: list[InputFeature],
+        label_features: list[LabelFeature],
+        settings: Settings,
+        include_train: bool = True,
+        include_test: bool = True,
+        include_validation: bool = True,
+    ) -> None:
         self._number_of_streams = settings.training_mux_number_of_active_streams
         self._sum_track_provider = sum_track_provider
         self._input_features = input_features
         self._label_features = label_features
         self._rng = get_random_number_generator(settings)
+        self._include_train = include_train
+        self._include_test = include_test
+        self._include_validation = include_validation
         self._settings = settings
 
     def _get_multiplexed_feature_iterator_for_split_type(
@@ -35,14 +47,14 @@ class SumTrackFeatureStreamMux:
         first = True
         while first or len(queues[split_type]) != 0 or len(active_streams) != 0:
             queue_sizes = {k: len(v) for k, v in queues.items()}
-            logger.debug(f"Multiplex loop for {split_type}, queue sizes: {queue_sizes}")
+            logger.info(f"Multiplex loop for {split_type}, queue sizes: {queue_sizes}")
             first = False
             if len(active_streams) < self._number_of_streams:
                 try:
                     sum_track, sum_track_split_type = next(sum_track_iterator)
                     active_streams.append((FeatureStream(sum_track, self._input_features, self._label_features, self._settings), sum_track_split_type))
                 except StopIteration:
-                    logger.debug("Multiplexer ran out of unused streams")
+                    logger.info("Multiplexer ran out of unused streams")
                     pass
             if len(queues[split_type]) != 0:
                 yield queues[split_type].pop(-1)
@@ -55,7 +67,7 @@ class SumTrackFeatureStreamMux:
                     active_streams.remove((active_stream, sum_track_split_type))
 
     def get_feature_iterators(self) -> tuple[FeatureStreamIteratorType, FeatureStreamIteratorType, FeatureStreamIteratorType]:
-        sum_track_iterator = iter(self._sum_track_provider.get_sum_tracks())
+        sum_track_iterator = iter(self._sum_track_provider.get_sum_tracks(self._include_train, self._include_test, self._include_validation))
         queues: dict[SumTrackSplitType, list[tuple[list[FloatArray], list[FloatArray]]]] = {
             SumTrackSplitType.TRAIN: [],
             SumTrackSplitType.TEST: [],
