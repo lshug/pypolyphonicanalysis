@@ -39,7 +39,7 @@ def feature_is_generated_for_file(file: Path, feature: Features, settings: Setti
 
 def sum_track_n_frames_is_saved_in_feature_store(sum_track_name: str, settings: Settings) -> bool:
     sum_track_feature_store_path = get_features_path(settings).joinpath(sum_track_name)
-    return sum_track_feature_store_path.joinpath("duration.json").is_file()
+    return sum_track_feature_store_path.joinpath("n_frames.json").is_file()
 
 
 def get_sum_track_n_frames_from_feature_store(sum_track_name: str, settings: Settings) -> int:
@@ -91,9 +91,9 @@ class FeatureStore:
 
     def generate_or_load_feature_for_sum_track(self, sum_track: SumTrack, feature: Features) -> FloatArray:
         if feature_is_generated_for_sum_track(sum_track, feature, self._settings):
-            logger.debug(f"Loading saved feature {feature} for {sum_track}")
+            logger.info(f"Loading saved feature {feature} for {sum_track}")
             return load_feature_for_sum_track(sum_track, feature, self._settings)
-        logger.debug(f"Generating feature {feature} for {sum_track}")
+        logger.info(f"Generating feature {feature} for {sum_track}")
         return self._generate_feature_for_sum_track(sum_track, feature)
 
     def generate_all_features_for_sum_track(self, sum_track: SumTrack) -> None:

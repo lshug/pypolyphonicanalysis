@@ -20,7 +20,7 @@ from scripts.conservatoire_corpus_tools.conservatoire_corpus_utils import load_c
 
 logging.basicConfig(level=logging.INFO)
 
-settings = Settings()
+settings = Settings(data_directory_path="/home/user/PycharmProjects/pypolyphonicanalysis/data")
 model = BaselineModel(settings, "model")
 
 processors = [

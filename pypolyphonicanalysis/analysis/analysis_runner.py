@@ -475,7 +475,7 @@ class AutomaticAnalysisRunner:
             index=[recording.name for recording in recordings],
             columns=[recording.name for recording in recordings],
         )
-        plt.figure(figsize=self._settings.default_figsize)
+        plt.figure(figsize=(len(recordings) / 2, len(recordings) / 2))
         sn.heatmap(df_cm, annot=True, fmt="g")
         plt.title("Estimated interval distributions' Wasserstein distance matrix")
         plt.savefig(os.path.join(self._output_path, "distribution_distance_matrix.jpg"))

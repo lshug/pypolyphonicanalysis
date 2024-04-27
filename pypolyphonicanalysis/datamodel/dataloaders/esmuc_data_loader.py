@@ -39,11 +39,12 @@ class ESMUCDataLoader(BaseDataLoader):
                                     track_name = f"{file_string_template.format(song, take, voice)}"
                                     wav_filename = f"{track_name}.wav"
                                     f0_filename = f"{track_name}.f0"
+                                    f0_path = corpus_path.joinpath(f0_filename)
                                     voice_track = Track(
                                         name=track_name,
                                         audio_source=corpus_path.joinpath(wav_filename),
                                         settings=self._settings,
-                                        f0_source=corpus_path.joinpath(f0_filename),
+                                        f0_source=f0_path if f0_path.is_file() else None,
                                     )
                                     tracks.append(voice_track)
                                 yield Multitrack((tracks[0], tracks[1], tracks[2], tracks[3]))

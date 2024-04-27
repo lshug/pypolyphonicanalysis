@@ -34,10 +34,10 @@ class BaseSummingStrategy(abc.ABC):
         """Sums the multitrack and returns a tuple of the summed track and processed multitrack"""
         sum_name = self.get_sum_track_name(multitrack)
         if sum_track_is_saved(sum_name, self._settings):
-            logger.debug(f"Loading saved sum track {sum_name}")
+            logger.info(f"Loading saved sum track {sum_name}")
             return load_sum_track(sum_name, self._settings)
         else:
-            logger.debug(f"Summing {multitrack} with {self}")
+            logger.info(f"Summing {multitrack} with {self}")
             sum_audio_array, multitrack = self._get_sum(multitrack)
             sum_track = SumTrack(sum_name, sum_audio_array, multitrack, self._settings)
             return sum_track
