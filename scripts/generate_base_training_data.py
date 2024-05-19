@@ -58,6 +58,7 @@ dataloaders_and_summing_strategies: list[tuple[BaseDataLoader, list[BaseSummingS
     (ESMUCDataLoader(shuffle, settings), summing_strategies[:2]),
     (CantoriaDataLoader(shuffle, settings), summing_strategies),
 ]
+
 pitch_shift_probabilities: dict[float, float] = {-1.5: 1, -0.5: 1, 0.5: 1, 1.5: 1}
 pitch_shift_displacement_range = (-0.5, 0.5)
 sum_track_processors: list[BaseSumTrackProcessor] = [AddNoise(settings), Filter(settings), Distort(settings)]

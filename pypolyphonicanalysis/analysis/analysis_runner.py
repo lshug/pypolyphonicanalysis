@@ -256,6 +256,12 @@ class AutomaticAnalysisRunner:
         plt.savefig(cluster_output_path.joinpath(f"{safe_filename_prefix}_harmonic_interval_distribution.jpg"))
         plt.close()
 
+    def _export_recording_metadata(self, recording: Recording) -> None:
+        recording_output_path = self._output_path.joinpath(recording.name)
+        check_output_path(recording_output_path)
+        with open(recording_output_path.joinpath("metadata.json"), "w", encoding="utf8") as f:
+            f.write(recording.model_dump_json(indent=4))
+
     def _model_harmonic_interval_distribution(self, harmonic_intervals: FloatArray, name: str) -> tuple[list[tuple[float, float, float]], KernelDensity]:
         if len(harmonic_intervals) == 0:
             logger.warning(f"No harmonic intervals found in {name}")
@@ -298,7 +304,7 @@ class AutomaticAnalysisRunner:
             t = np.linspace(0.0, 0.5, int(sr * 0.5))
             y = np.sin(freq * t)
             arr = np.concatenate((arr, y))
-        wavfile.write(output_path.joinpath(f"{name}_dervied_scale.wav"), sr, arr)
+        wavfile.write(output_path.joinpath(f"{name}_derived_scale.wav"), sr, arr)
 
     def _get_harmonic_interval_ground_truth_gmm_parameters(self, recording: Recording) -> list[tuple[float, float, float]] | None:
         if recording.ground_truth_files is None:
@@ -388,6 +394,7 @@ class AutomaticAnalysisRunner:
         self._export_recording_harmonic_interval_distribution_plots_and_files(
             harmonic_intervals, kde, gaussian_mixture_weights_means_variances, self._get_harmonic_interval_ground_truth_gmm_parameters(recording), recording.name
         )
+        self._export_recording_metadata(recording)
 
         return ((times, freqs), harmonic_intervals, gaussian_mixture_weights_means_variances)
 
@@ -396,7 +403,6 @@ class AutomaticAnalysisRunner:
         gmm_parameters: list[list[tuple[float, float, float]]],
     ) -> list[tuple[float, float, float]]:
         x = np.linspace(1, 1300, 1000).reshape(-1, 1)
-        plt.figure(figsize=self._settings.default_figsize)
         combined_weights: list[float] = []
         combined_means: list[float] = []
         combined_vars: list[float] = []
@@ -475,8 +481,9 @@ class AutomaticAnalysisRunner:
             index=[recording.name for recording in recordings],
             columns=[recording.name for recording in recordings],
         )
-        plt.figure(figsize=(len(recordings) / 2, len(recordings) / 2))
-        sn.heatmap(df_cm, annot=True, fmt="g")
+        df_cm.to_csv(os.path.join(self._output_path, "distribution_distance_matrix.csv"))
+        plt.figure(figsize=(1.7 * len(recordings) / 2, 1.7 * len(recordings) / 2))
+        sn.heatmap(df_cm, annot=True, fmt=".2f")
         plt.title("Estimated interval distributions' Wasserstein distance matrix")
         plt.savefig(os.path.join(self._output_path, "distribution_distance_matrix.jpg"))
         plt.close()
@@ -508,8 +515,10 @@ class AutomaticAnalysisRunner:
                     current_count += counts[child_idx - n_samples]
             counts[i] = current_count
 
-        for child in clustering.children_:
+        linkage_index_to_recording_name_set_dict: dict[int, set[str]] = {}
+        for linkage_idx, child in enumerate(clustering.children_):
             clusters.append([recordings[idx] for idx in _get_cluster_recording_idxs_from_child(child, clustering.children_, len(clustering.labels_))])
+            linkage_index_to_recording_name_set_dict[linkage_idx] = set(recording.name for recording in clusters[-1])
 
         linkage_matrix = np.column_stack([clustering.children_, clustering.distances_, counts]).astype(float)
 
@@ -524,12 +533,20 @@ class AutomaticAnalysisRunner:
         dendrogram_ax.set_xlabel("Wasserstein distance")
         dendrogram_ax.set_title("Hierarchical Clustering Dendrogram of Estimated GMMs")
 
-        dendrogram(
+        link_order: list[int] = []
+
+        def _link_order_tracker(link_index: int) -> str:
+            link_order.append(link_index - len(recordings))
+            return "C0"
+
+        dendrogram_data = dendrogram(
             linkage_matrix,
             ax=dendrogram_ax,
             labels=[recording.name for recording in recordings],
             orientation="right",
             leaf_font_size=6,
+            color_threshold=float(0),
+            link_color_func=_link_order_tracker,
         )
 
         tick_labels = []
@@ -551,6 +568,15 @@ class AutomaticAnalysisRunner:
         tick_width = np.diff(ticks)[-1]
         y_lim = dendrogram_ax.get_ylim()
 
+        icoord = dendrogram_data["icoord"]
+        dcoord = dendrogram_data["dcoord"]
+        for idx, (ys, xs) in enumerate(zip(icoord, dcoord)):
+            x = xs[1]
+            y = (ys[1] + ys[2]) / 2
+            point = (x, y)
+            dendrogram_ax.annotate(f"cluster_{link_order[idx]}", point)
+            idx += 1
+
         distribution_ax.set_title("Interval distribution")
         distribution_ax.set_xlabel("Cents")
         distribution_ax.set_xlim(0, 1200)
@@ -571,6 +597,7 @@ class AutomaticAnalysisRunner:
         distribution_ax.pcolormesh(x_corners, y_corners, color_data, cmap="binary", norm=None)
 
         fig.savefig(self._output_path.joinpath("hierarchical_clustering_dendrogram_of_estimated_gmms.jpg"))
+        fig.savefig(self._output_path.joinpath("hierarchical_clustering_dendrogram_of_estimated_gmms.pdf"), format="pdf", bbox_inches="tight")
         plt.close(fig)
 
         return clusters
