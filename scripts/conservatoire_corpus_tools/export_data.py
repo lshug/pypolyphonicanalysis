@@ -8,6 +8,7 @@ from scripts.conservatoire_corpus_tools.conservatoire_corpus_utils import (
     extract_cd_item_track_from_cipher,
     CatalogEntry,
     get_conservatoire_corpus_path,
+    GroupType,
 )
 
 
@@ -45,6 +46,38 @@ def process_recording_date_day(field_str: str | None, uncertain_fields: set[str]
         uncertain_fields.add("recording_date_day")
         return int(field_str.split(",")[0])
     return int(field_str)
+
+
+def process_group_type(field_str: str | None, uncertain_fields: set[str], field_name: str) -> GroupType | None:
+    if field_str is None or field_str == "?" or field_str.strip() == "":
+        return None
+    if "?" in field_str:
+        uncertain_fields.add(field_name)
+    if "solo" in field_str:
+        return GroupType.SOLO
+    if "qalTa" in field_str and "mamakacTa" in field_str:
+        return GroupType.MIXED
+    if "bavSvTa" in field_str:
+        return GroupType.CHILDRENS
+    if "Sereuli" in field_str:
+        return GroupType.MIXED
+    if "qalTa" in field_str:
+        return GroupType.WOMENS
+    if "mamakacTa" in field_str:
+        return GroupType.MENS
+    if "monacvle" in field_str:
+        return GroupType.ALTERNATING
+    elif "SeuzRudavi" in field_str:
+        return GroupType.UNRESTRICTED
+    return None
+
+
+def process_repertoire_group_type(field_str: str | None, uncertain_fields: set[str]) -> GroupType | None:
+    return process_group_type(field_str, uncertain_fields, "repertoire_group_type")
+
+
+def process_performer_group_type(field_str: str | None, uncertain_fields: set[str]) -> GroupType | None:
+    return process_group_type(field_str, uncertain_fields, "performer_group_type")
 
 
 settings = Settings()
@@ -115,8 +148,8 @@ for item in data:
             # polyphony_form
             instruments=item["sakravi"],
             # instrument_tuning
-            # repertoire_group_type
-            # performer_group_type
+            repertoire_group_type=process_repertoire_group_type(item["repertuaris_jgufi"], uncertain_fields),
+            performer_group_type=process_performer_group_type(item["SemsrulebelTa_jgufi"], uncertain_fields),
             nationality=item["erovnuli_kuTvnileba"],
             dialect=item["dialeqti"],
             group_leader=item["jgufis_xelmZRvaneli"],

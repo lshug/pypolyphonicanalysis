@@ -89,7 +89,13 @@ class Tuning(Enum):
 
 
 class GroupType(Enum):
-    pass
+    SOLO = 0
+    WOMENS = 1
+    MENS = 2
+    ALTERNATING = 3
+    MIXED = 4
+    CHILDRENS = 5
+    UNRESTRICTED = 6
 
 
 class Nationality(Enum):
@@ -132,7 +138,6 @@ class CatalogEntry(BaseModel):
 
     authenticity: AuthenticityClass | None = None
     sample_type: RecordingType | None = None
-    performing_group_type: GroupType | None = None
     performance_type: PerformanceType | None = None
     number_of_voices: PositiveInt | None = None
     polyphony_form: PolyphonyForm | None = None

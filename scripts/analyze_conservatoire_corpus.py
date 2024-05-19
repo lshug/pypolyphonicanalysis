@@ -3,7 +3,6 @@ import os
 from pathlib import Path
 
 import librosa
-from anbani.nlp.georgianisation import georgianise
 
 from pypolyphonicanalysis.analysis.analysis_runner import (
     AutomaticAnalysisRunner,
@@ -20,7 +19,11 @@ from scripts.conservatoire_corpus_tools.conservatoire_corpus_utils import load_c
 
 logging.basicConfig(level=logging.INFO)
 
-settings = Settings(data_directory_path="/home/user/PycharmProjects/pypolyphonicanalysis/data")
+logger = logging.getLogger(__name__)
+
+logger.debug(f"{MostLikelyVoicesFilter}, {LogLinearDetrender} imported")
+
+settings = Settings()
 model = BaselineModel(settings, "model")
 
 processors = [
@@ -48,8 +51,10 @@ for file in os.listdir("audio/svaneti"):
                 name=file.split(".")[0],
                 file_path=file_path,
                 number_of_voices=3,
-                performers=georgianise(entry.performers[:50], mode="fast") if entry.performers is not None else None,
-                recording_site=georgianise(entry.recording_site, mode="fast") if entry.recording_site is not None else None,
+                performers=entry.performers[:50] if entry.performers is not None else None,
+                performer_group_type=entry.performer_group_type.name if entry.performer_group_type is not None else None,
+                group_leader=entry.group_leader,
+                recording_site=entry.recording_site if entry.recording_site is not None else None,
                 recording_date=recording_date if recording_date != "None-None-None" else None,
             )
         )
