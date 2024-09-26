@@ -14,3 +14,4 @@ class Recording(BaseModel, frozen=True):
     recording_site: str | None = None
     recording_date: str | None = None
     recording_creator: str | None = None
+    recording_region: str | None = None

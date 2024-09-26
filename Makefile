@@ -1,6 +1,6 @@
 .DEFAULT_GOAL:=all
 black = black .
-mypy = mypy --config-file setup.cfg --no-incremental .
+mypy = mypy --config-file pyproject.toml --no-incremental .
 ruff = ruff check .
 
 .PHONY: format
