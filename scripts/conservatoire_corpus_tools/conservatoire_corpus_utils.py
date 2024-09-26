@@ -81,7 +81,38 @@ class PolyphonyForm(Enum):
 
 
 class Instrument(Enum):
-    pass
+    Cangi = 0
+    Conguri = 1
+    Wianuri = 2
+    Wiboni = 3
+    Wuniri = 4
+    aWarpani = 5
+    afxerca = 6
+    buzika = 7
+    daira = 8
+    doli = 9
+    duduki = 10
+    fandurebi = 11
+    fanduri = 12
+    fortepiano = 13
+    fxaCica = 14
+    fxarCaka = 15
+    fxawCa = 16
+    garmoni = 17
+    gitara = 18
+    gudastviri = 19
+    kanoni = 20
+    klarneti = 21
+    larWemi = 22
+    qamanCa = 23
+    salamuri = 24
+    salamuri_ueno = 25
+    sazi = 26
+    simebiani = 27
+    soinari = 28
+    stviri = 29
+    taSi = 30
+    xarsa = 31
 
 
 class Tuning(Enum):
@@ -116,6 +147,7 @@ class CatalogEntry(BaseModel):
     catalog_code: str
     tape: str
     track: str
+    file_name: str
     file_path: str
 
     notes: str | None = None
@@ -125,6 +157,7 @@ class CatalogEntry(BaseModel):
     recording_date_month: PositiveInt | None = Field(None, ge=1, le=12)
     recording_date_day: PositiveInt | None = Field(None, ge=1, le=31)
     recording_site: str | None = None
+    recording_region: str | None = None
     # recording_creator: Identity | None = None
     recording_creator: str | None = None
     # catalog_entry_contributor: Identity | None = None
@@ -137,12 +170,12 @@ class CatalogEntry(BaseModel):
     thematic_and_genre_tags: str | None = None
 
     authenticity: AuthenticityClass | None = None
-    sample_type: RecordingType | None = None
+    # sample_type: RecordingType | None = None
+    sample_type: str | None = None
     performance_type: PerformanceType | None = None
     number_of_voices: PositiveInt | None = None
     polyphony_form: PolyphonyForm | None = None
-    # instruments: list[Instrument] = Field([])
-    instruments: str | None = None
+    instruments: list[Instrument] = Field([])
     instrument_tuning: Tuning | None = None
     repertoire_group_type: GroupType | None = None
     performer_group_type: GroupType | None = None
@@ -184,9 +217,10 @@ def load_raw_catalog_data(settings: Settings) -> list[RawCatalogData]:
     return data
 
 
-def load_catalog_data(settings: Settings) -> list[CatalogEntry]:
+def load_catalog_data(settings: Settings) -> dict[str, CatalogEntry]:
     corpus_path = get_conservatoire_corpus_path(settings)
-    return [CatalogEntry.model_validate(json.loads(item)) for item in json.load(open(corpus_path.joinpath("exported_data.json")))]
+    catalog_items = [CatalogEntry.model_validate(json.loads(item)) for item in json.load(open(corpus_path.joinpath("exported_data.json")))]
+    return {entry.file_name: entry for entry in catalog_items}
 
 
 def remove_leading_zeros(s: str) -> str:

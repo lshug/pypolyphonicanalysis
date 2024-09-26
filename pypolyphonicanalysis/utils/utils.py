@@ -190,7 +190,7 @@ def plot_predictions(
         valid_idxs = voice_freqs > 0
         voice_freqs = voice_freqs[valid_idxs]
         cents = 1200 * np.log2(voice_freqs / librosa.note_to_hz("A1"))
-        plt.plot(times[valid_idxs], cents, next(color_cycle), label=f"Voice {idx}")
+        plt.plot(times[valid_idxs], cents, next(color_cycle), label=f"Index {idx}")
     if correction_values is not None:
         plt.plot(times, 1200 * np.log2(np.mean(freqs[freqs > 0]) / librosa.note_to_hz("A1")) + correction_values, "-k", label="Est. pitch drift")
     plt.legend()
